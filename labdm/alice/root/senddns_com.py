@@ -134,7 +134,7 @@ Host: %s
 Accept: application/dns-message
 
 """ % (path,server,))
-  print("\n\tenter : senddoh ; s.send ; path= "+str(path)+"\n")
+  print("\n\tsortie : senddoh ; s.send ; path= "+str(path)+"\n")
 
 def tupletostring(t):
   """concatene un tuple de chaines de caracteres en une seule chaine"""
@@ -295,3 +295,6 @@ if arcount:
     i=pos
     print(name+"   "+numbertotype(typ)+"   "+str(clas)+"   "+str(ttl)+"   "+str(dat))
   print("\n")
+
+
+#test com
