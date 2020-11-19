@@ -122,6 +122,70 @@ def numbertotype(typ):
     print("\n\tsortie : numbertotype ; (2) return= 'NS'\n")
     return 'NS'
 
+def typenumber(typ):
+  """associe un entier a un nom de type"""
+  print("\n\tenter : typenumber : typ= "+str(typ)+"\n")
+  if typ=='A':
+    print("\n\tsortie : typenumber ; ('A') return= 1\n")
+    return 1
+  if typ=='MX':
+    print("\n\tsortie : typenumber ; ('MX') return= 15\n")
+    return 15
+  if typ=='NS':
+    print("\n\tsortie : typenumber ; ('NS')return= 2\n")
+    return 2
+
+def contructDnsRequest(name,typ):
+  """"contruction de la requet dns"""
+  print("\n\tenter : contructDnsRequest : name= "+str(name)+" typ= "+str(typ)+"\n")
+  data=""
+  print("data 1= "+str(data))
+  #id sur 2 octets
+  data=data+struct.pack(">H",0)
+  print("data 2= "+str(data)+" remarq= id sur 2octets")
+  # octet suivant : Recursion Desired
+  data=data+struct.pack("B",1)
+  print("data 3= "+str(data)+" remarq= octet suivant : Recursion Desired")
+  #octet suivant : 0
+  data=data+struct.pack("B",0)
+  print("data 4= "+str(data)+" remarq= octet suivant : 0")
+  #QDCOUNT sur 2 octets
+  data=data+struct.pack(">H",1)
+  print("data 5= "+str(data)+" remarq= QDCOUNT sur 2 octets")
+  data=data+struct.pack(">H",0)
+  print("data 6= "+str(data))
+  data=data+struct.pack(">H",0)
+  print("data 7= "+str(data))
+  data=data+struct.pack(">H",0)
+  print("data 8= "+str(data))
+  print("\nDATA = "+str(data)+"\n")
+
+  splitname=name.split('.')
+  for c in splitname:
+    print("splitname c= "+str(c))
+    data=data+struct.pack("B",len(c))
+    print("data 9= "+str(data))
+    for l in c:
+      print("for l in c ; l= "+str(l))
+      data=data+struct.pack("c",l)
+      print("data 10= "+str(data))
+
+  data=data+struct.pack("B",0)
+  print("data 11= "+str(data))
+  #TYPE
+  data=data+struct.pack(">H",typenumber(typ))
+  print("data 12= "+str(data)+" remarq = TYPE")
+  #CLASS 1 (IN) par defaut
+  data=data+struct.pack(">H",1)
+  print("data 13= "+str(data)+" remarq = CLASS 1 (IN) par defaut")
+
+  print("\n\tsortie : contructDnsRequest : DATA= "+str(data)+"\n")
+  return data
+
+
+
+
+
 
 while True:
     (data,addr)=s.accept()
@@ -146,23 +210,24 @@ while True:
     s.close()
 
     name,typ,clas = getNameDomaine(dns_b64decode);
-    print("name ="+name+"   "+"type ="+numbertotype(typ)+"   "+"class ="+str(clas))
+    print("name ="+name+"   "+"type = "+numbertotype(typ)+" ; type number = "+str(typ)+"   "+"class ="+str(clas))
 
 
-    exit()
+    t=socket(AF_INET, SOCK_STREAM)
+    t.connect(('1.2.3.4',53))
+    print("\nConnected to ispA = 1.2.3.4 port 53")
 
-    print("connect a ispa")
-    t=socket()
-    t.connect(("1.2.3.4",53))
-    print("Connected to ispA = 1.2.3.4 port 53")
-
-
-
-    requete_dns = "ping 8.8.8.8"
+    # sur wireshark : [MalFormed Packet: DNS]
+    # donc c'est dans la construction de la requete qu il y a un pb
+    requete_dns=contructDnsRequest(name,numbertotype(typ))
+  
     t.send(requete_dns)
     print("-> envoie requete dns")
+    
     data_recv=t.recv(1024)
     print("<- rep requete dns : data ="+str(data_recv))
+
+    exit()
 
 
 
