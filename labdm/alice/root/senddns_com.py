@@ -185,6 +185,9 @@ def recvdoh(s):
 
 
 senddoh(bdata,s)
+
+print("\n######################\n#       Etape 3      #\n######################\n")
+
 data=recvdoh(s)
 
 
@@ -199,6 +202,7 @@ arcount=header[6]
 
 def getname(string,pos):
   """recupere le nom de domaine encode dans une reponse DNS a la position p, en lecture directe ou en compression"""
+  print("\n\tenter : getname : string= "+str(string)+" pos= "+str(pos)+"\n")
   p=pos
   save=0
   name=""
@@ -220,21 +224,25 @@ def getname(string,pos):
     p=p+l
   if save > 0:
     p=save+2
+  print("\n\tsortie : getname : p= "+str(p)+" name = "+str(name)+"\n")
   return p,name
 
 i=12
 def retrquest(string,pos):
   """decrit une section question presente dans la reponse DNS string a la position pos"""
+  print("\n\tenter : retrquest : string= "+str(string)+" pos= "+str(pos)+"\n")
   p=pos
   p,name=getname(string,p)
   typ = struct.unpack(">H",string[p:p+2])[0]
   p=p+2
   clas = struct.unpack(">H",string[p:p+2])[0]
   p=p+2
+  print("\n\tsortie : retrquest : p= "+str(p)+" name = "+str(name)+" typ= "+str(typ)+" clas= "+str(clas)+"\n")
   return p,name,typ,clas
 
 def retrrr(string,pos):
   """decrit une section resource record presente dans la reponse DNS string a la position pos"""
+  print("\n\tenter : retrrr : string= "+str(string)+" pos= "+str(pos)+"\n")
   p=pos
   p,name=getname(string,p)
   typ = struct.unpack(">H",string[p:p+2])[0]
@@ -257,6 +265,7 @@ def retrrr(string,pos):
   if typ not in [1,2,15]:
     dat = struct.unpack("B"*datalen,string[p:(p+datalen)])
   p=p+datalen
+  print("\n\tsortie : retrrr : p= "+str(p)+" name = "+str(name)+" typ= "+str(typ)+" clas= "+str(clas)+" ttl ="+str(ttlcpl[0]*256+ttlcpl[1])+" datalenght= "+str(datalen)+" dat= "+str(dat)+"\n")
   return p,name,typ,clas,ttlcpl[0]*256+ttlcpl[1],datalen,dat
 
 #Affichage de la reponse, section par section

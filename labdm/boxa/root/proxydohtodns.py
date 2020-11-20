@@ -179,10 +179,25 @@ def contructDnsRequest(name,typ):
   data=data+struct.pack(">H",1)
   print("data 13= "+str(data)+" remarq = CLASS 1 (IN) par defaut")
 
+  # ttp sur 2 octet
+
+  # longueur 1 octet
+
+  # data sur x octet
+
   print("\n\tsortie : contructDnsRequest : DATA= "+str(data)+"\n")
   return data
 
+def sendToAlice(data,s,leng):
+  """"""
+  print("\n\tenter : sendToAlice : data="+str(data)+"\n")
+  s.send("""HTTP/1.0 200 OK
+Content-Type: application/dns-message
+Content-Length: %s
 
+%s
+""" % (leng,data,))
+  print("\n\tsortie : sendToAlice ; s.send \n")
 
 
 
@@ -207,18 +222,14 @@ while True:
     dns_b64decode = base64.b64decode(dns_b64encode,'-_')
     print("dns decode64 = "+dns_b64decode)
 
-    s.close()
-
     name,typ,clas = getNameDomaine(dns_b64decode);
     print("name ="+name+"   "+"type = "+numbertotype(typ)+" ; type number = "+str(typ)+"   "+"class ="+str(clas))
 
 
-    t=socket(AF_INET, SOCK_STREAM)
+    t=socket(AF_INET, SOCK_DGRAM)
     t.connect(('1.2.3.4',53))
     print("\nConnected to ispA = 1.2.3.4 port 53")
 
-    # sur wireshark : [MalFormed Packet: DNS]
-    # donc c'est dans la construction de la requete qu il y a un pb
     requete_dns=contructDnsRequest(name,numbertotype(typ))
   
     t.send(requete_dns)
@@ -226,6 +237,12 @@ while True:
     
     data_recv=t.recv(1024)
     print("<- rep requete dns : data ="+str(data_recv))
+
+    leng=len(data_recv)
+    print("lenght ="+str(leng))
+    sendToAlice(data_recv,s,leng)
+    print("-> envoie reponse to alice")
+
 
     exit()
 
