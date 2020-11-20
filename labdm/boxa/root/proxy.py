@@ -13,7 +13,6 @@ s.bind(('0.0.0.0', 80))
 s.listen(3)
 print ("\nPROXY doh to dns : Lance en ecoute sur le port 80\n") 
 
-['www.lexique.com\tIN  A\t9.9.9.9\n', 'cold.net\tIN  MX\t5 smtp.cold.net\n', 'smtp.cold.net\tIN  A\t213.186.33.5\n']
 
 ###############################
 #                             #
@@ -103,9 +102,11 @@ def getname(string,pos):
 
 def tupletostring(t):
   """concatene un tuple de chaines de caracteres en une seule chaine"""
+  print("\n\tenter : tupletostring : t="+str(t)+"\n")
   s=""
   for c in t:
     s=s+c
+  print("\n\tsortie : tupletostring ; s= "+str(s)+"\n")
   return s
 
 def numbertotype(typ):
@@ -199,107 +200,6 @@ Content-Length: %s
   print("\n\tsortie : sendToAlice ; s.send \n")
 
 
-def Isknown(name,typ):
-  file = open("/etc/bind/db.static","r")
-  tab=file.readlines()
-  file.close()
-  #['www.lexique.com\tIN  A\t9.9.9.9\n', 'cold.net\tIN  MX\t5 smtp.cold.net\n', 'smtp.cold.net\tIN  A\t213.186.33.5\n']
-
-  for ligne in tab:
-    print(ligne)
-    domain=ligne.split("\t")[0]
-    typee=ligne.split("\t")[1].split("  ")[1]
-    result=ligne.split("\t")[2]
-
-    if domain==name and typee==typ:
-      print(">deja connu")
-      return True,result
-    else:
-      print(">inconnu")
-  return False,""
-
-
-def contructDnsReply(name,typ):
-  """"""
-  
-
-
-
-
-def getname(string,pos):
-  """recupere le nom de domaine encode dans une reponse DNS a la position p, en lecture directe ou en compression"""
-  print("\n\tenter : getname : string= "+str(string)+" pos= "+str(pos)+"\n")
-  p=pos
-  save=0
-  name=""
-  l=1
-  if l==0:
-    return p+1,""
-  while l:
-    l=struct.unpack("B",string[p])[0]
-    if l>=192:
-      #compression du message : les 2 premiers octets sont les 2 bits 11 puis le decalage depuis le debut de l'ID sur 14 bits
-      if save == 0:
-        save=p
-      p=(l-192)*256+(struct.unpack("B",string[p+1])[0])
-      l=struct.unpack("B",string[p])[0]
-    if len(name) and l:
-      name=name+'.'
-    p=p+1
-    name=name+tupletostring(struct.unpack("c"*l,string[p:(p+l)]))
-    p=p+l
-  if save > 0:
-    p=save+2
-  print("\n\tsortie : getname : p= "+str(p)+" name = "+str(name)+"\n")
-  return p,name
-
-i=12
-def retrquest(string,pos):
-  """decrit une section question presente dans la reponse DNS string a la position pos"""
-  print("\n\tenter : retrquest : string= "+str(string)+" pos= "+str(pos)+"\n")
-  p=pos
-  p,name=getname(string,p)
-  typ = struct.unpack(">H",string[p:p+2])[0]
-  p=p+2
-  clas = struct.unpack(">H",string[p:p+2])[0]
-  p=p+2
-  print("\n\tsortie : retrquest : p= "+str(p)+" name = "+str(name)+" typ= "+str(typ)+" clas= "+str(clas)+"\n")
-  return p,name,typ,clas
-
-def retrrr(string,pos):
-  """decrit une section resource record presente dans la reponse DNS string a la position pos"""
-  print("\n\tenter : retrrr : string= "+str(string)+" pos= "+str(pos)+"\n")
-  p=pos
-  p,name=getname(string,p)
-  typ = struct.unpack(">H",string[p:p+2])[0]
-  p=p+2
-  clas = struct.unpack(">H",string[p:p+2])[0]
-  p=p+2
-  ttlcpl = struct.unpack(">HH",string[p:p+4])
-  p=p+4
-  datalen = struct.unpack(">H",string[p:p+2])[0]
-  p=p+2
-  if typ == 1:
-    aux = struct.unpack("B"*datalen,string[p:(p+datalen)])
-    dat = str(aux[0])+'.'+str(aux[1])+'.'+str(aux[2])+'.'+str(aux[3])
-  if typ == 2:
-    x,dat = getname(string,p)
-  if typ == 15:
-    pref = struct.unpack(">H",string[p:p+2])[0]
-    x,name = getname(string,p+2)
-    dat = (pref,name)
-  if typ not in [1,2,15]:
-    dat = struct.unpack("B"*datalen,string[p:(p+datalen)])
-  p=p+datalen
-  print("\n\tsortie : retrrr : p= "+str(p)+" name = "+str(name)+" typ= "+str(typ)+" clas= "+str(clas)+" ttl ="+str(ttlcpl[0]*256+ttlcpl[1])+" datalenght= "+str(datalen)+" dat= "+str(dat)+"\n")
-  return p,name,typ,clas,ttlcpl[0]*256+ttlcpl[1],datalen,dat
-
-
-
-
-
-
-
 
 
 while True:
@@ -324,99 +224,27 @@ while True:
 
     name,typ,clas = getNameDomaine(dns_b64decode);
     print("name ="+name+"   "+"type = "+numbertotype(typ)+" ; type number = "+str(typ)+"   "+"class ="+str(clas))
+
+
+    t=socket(AF_INET, SOCK_DGRAM)
+    t.connect(('1.2.3.4',53))
+    print("\nConnected to ispA = 1.2.3.4 port 53")
+
+    requete_dns=contructDnsRequest(name,numbertotype(typ))
+  
+    t.send(requete_dns)
+    print("-> envoie requete dns")
     
-    print('\n\n##############################\n')
+    data_recv=t.recv(1024)
+    print("<- rep requete dns : data ="+str(data_recv))
 
-    is_known,result=Isknown(name,numbertotype(typ))
-
-    print('\n##############################\n\n')
-
-    test=0
-    if is_known and test==2 :
-      print("resultat = "+result)
-    else:
-      t=socket(AF_INET, SOCK_DGRAM)
-      t.connect(('1.2.3.4',53))
-      print("\nConnected to ispA = 1.2.3.4 port 53")
-
-      requete_dns=contructDnsRequest(name,numbertotype(typ))
-    
-      t.send(requete_dns)
-      print("-> envoie requete dns")
-      
-      data_recv=t.recv(1024)
-      print("<- rep requete dns : data ="+str(data_recv))
-
-      leng=len(data_recv)
-      print("lenght ="+str(leng))
-      sendToAlice(data_recv,data,leng)
-      print("-> envoie reponse to alice")
-
-      data.close()
+    leng=len(data_recv)
+    print("lenght ="+str(leng))
+    sendToAlice(data_recv,data,leng)
+    print("-> envoie reponse to alice")
 
 
-      print("\n######################\n#       Descrip      #\n######################\n")
-
-      # decriptage pour le metre dans la bdd
-      data=data_recv
-      print("\n")
-      header=struct.unpack(">HBBHHHH",data[:12])
-      qdcount=header[3]
-      ancount=header[4]
-      nscount=header[5]
-      arcount=header[6] 
-
-      #Affichage de la reponse, section par section
-      print("QUERY: "+str(qdcount)+", ANSWER: "+str(ancount)+", AUTHORITY: "+str(nscount)+", ADDITIONAL: "+str(arcount)+'\n')
-
-      i=12
-      data_answer="null"
-      if qdcount:
-        print("QUERY SECTION :\n")
-        for j in range(qdcount):
-          pos,name,typ,clas=retrquest(data,i)
-          i=pos
-          name_bdd=name
-          typ_bdd=typ
-          clas_bdd=clas
-          print(name+"   "+numbertotype(typ)+"   "+str(clas))
-        print("\n")
-
-      if ancount:
-        print("ANSWER SECTION :\n")
-        for j in range(ancount):
-          pos,name,typ,clas,ttl,datalen,dat=retrrr(data,i)
-          i=pos
-          if typ == 15:
-            print(name+"   "+numbertotype(typ)+"   "+str(clas)+"   "+str(ttl)+"   "+str(dat[0])+"   "+dat[1])
-          else:
-            print(name+"   "+numbertotype(typ)+"   "+str(clas)+"   "+str(ttl)+"   "+str(dat))
-        print("\n")
-        data_answer=dat
-
-      if nscount:
-        print("AUTHORITY SECTION :\n")
-        for j in range(nscount):
-          pos,name,typ,clas,ttl,datalen,dat=retrrr(data,i)
-          i=pos
-          print("...")
-          #print(name+"   "+numbertotype(typ)+"   "+str(clas)+"   "+str(ttl)+"   "+"str(dat)=...")
-        print("\n")
-
-      if arcount:
-        print("ADDITIONAL SECTION :\n")
-        for j in range(arcount):
-          pos,name,typ,clas,ttl,datalen,dat=retrrr(data,i)
-          i=pos
-          print(name+"   "+numbertotype(typ)+"   "+str(clas)+"   "+str(ttl)+"   "+str(dat))
-        print("\n")
-
-      print("\n----------------------------------------------\n")
-      if data_answer!="null":
-        print("\n A STOCKE : "+name_bdd+"\t"+numbertotype(typ_bdd)+"  "+str(clas_bdd)+"\t"+str(data_answer)+"\n")
-      print("\n----------------------------------------------\n")
+    exit()
 
 
 
-    t.close()
-    
