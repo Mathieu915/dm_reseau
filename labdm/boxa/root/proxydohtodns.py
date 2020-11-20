@@ -134,6 +134,17 @@ def typenumber(typ):
     print("\n\tsortie : typenumber ; ('NS')return= 2\n")
     return 2
 
+def clasnumber(clas):
+  """associe un entier a un nom une classe"""
+  if clas=='IN':
+    return 1
+  if clas=='CS':
+    return 2
+  if clas=='CH':
+    return 3
+  if clas=='HS':
+    return 4
+
 def contructDnsRequest(name,typ):
   """"contruction de la requet dns"""
   print("\n\tenter : contructDnsRequest : name= "+str(name)+" typ= "+str(typ)+"\n")
@@ -209,19 +220,102 @@ def Isknown(name,typ):
     print(ligne)
     domain=ligne.split("\t")[0]
     typee=ligne.split("\t")[1].split("  ")[1]
+    clas=ligne.split("\t")[1].split("  ")[0]
     result=ligne.split("\t")[2]
 
+    print("domain = "+domain+" name = "+name+" ; typee = "+typee+" type = "+typ)
     if domain==name and typee==typ:
       print(">deja connu")
-      return True,result
+      return True,domain,clas,typee,result
     else:
       print(">inconnu")
-  return False,""
+  return False,"","","",""
 
+def stock(name, typ, clas, data):
+  print("\n enter : stock")
+  file = open("/etc/bind/db.static","a")
+  if clas==1:
+    file.write(name+"\t"+"IN"+"  "+numbertotype(typ)+"\t"+str(data)+"\n")
+  elif clas==2:
+    file.write(name+"\t"+"CS"+"  "+numbertotype(typ)+"\t"+str(data)+"\n")
+  elif clas==3:
+    file.write(name+"\t"+"CH"+"  "+numbertotype(typ)+"\t"+str(data)+"\n")
+  elif clas==4:
+    file.write(name+"\t"+"HS"+"  "+numbertotype(typ)+"\t"+str(data)+"\n")
+  else:
+    pass
+  file.close();
+  print("\n sortie : stock")
 
-def contructDnsReply(name,typ):
+def contructDnsReply(domain,clas,typ,result):
   """"""
+  print("\nenter : contructDnsReply")
+
+  data=""
+  #id sur 2 octets
+  data=data+struct.pack(">H",0)
+  # octet suivant : Recursion Desired
+  data=data+struct.pack("B",1)
+ 
+  #octet suivant : 0
+  data=data+struct.pack("B",0)
+ 
+  #QDCOUNT sur 2 octets
+  data=data+struct.pack(">H",1)
+  #ANCOUNT sur 2 octets
+  data=data+struct.pack(">H",1)
+  #NScount su 2 octets
+  data=data+struct.pack(">H",0) # ToDo quand type = NS ou MX
+  #ARcount su 2 octets
+  data=data+struct.pack(">H",0) # ToDo quand type = NS ou MX
   
+  nb_octet=12
+
+  # non de domaine su x octets
+  splitname=domain.split('.')
+  for c in splitname:
+    data=data+struct.pack("B",len(c))
+    nb_octet=nb_octet+1
+    for l in c:
+      data=data+struct.pack("c",l)
+      nb_octet=nb_octet+1
+
+  # 1 octet = 00 pr dire la fin du nom de dommaine
+  data=data+struct.pack("B",0)
+
+  #TYPE
+  data=data+struct.pack(">H",typenumber(typ))
+
+  #CLASS 
+  data=data+struct.pack(">H",clasnumber(clas))
+
+
+  # ttl sur 2 octet
+  data=data+struct.pack(">H",0)
+  data=data+struct.pack("H",60)
+
+  nb_octet=nb_octet+6 # en comptant l'octet de la longueur
+  # splitip1=result.split('.')
+  # for x in splitip1:
+  #   nb_octet=nb_octet+1
+
+  print("longueur ====>"+str(nb_octet))
+  # longueur 1 octet
+  data=data+struct.pack(">B",nb_octet)
+
+  # data sur x octet
+  splitip=result.split('.')
+  for x in splitip:
+    data=data+struct.pack(">H",int(x))
+  data=data+struct.pack(">H",0)
+  data=data+struct.pack(">H",0)
+  data=data+struct.pack(">H",0)
+  data=data+struct.pack(">H",0)
+
+
+
+  print("\n\tsortie : contructDnsRequest : DATA= "+str(data)+"\n")
+  return data
 
 
 
@@ -327,13 +421,21 @@ while True:
     
     print('\n\n##############################\n')
 
-    is_known,result=Isknown(name,numbertotype(typ))
+    is_known,domain,clas,typee,result=Isknown(name,numbertotype(typ))
 
     print('\n##############################\n\n')
 
     test=0
-    if is_known and test==2 :
-      print("resultat = "+result)
+    if is_known and test==0 :
+      print("Ligne : domaine = "+domain+" clas = "+clas+" type = "+typee+" result = "+result)
+
+      requete_dns=contructDnsReply(domain,clas,typee,result)
+
+      leng=90
+      sendToAlice(requete_dns,data,leng)
+      print("--------> envoie reponse to alice\n")
+      data.close()
+      
     else:
       t=socket(AF_INET, SOCK_DGRAM)
       t.connect(('1.2.3.4',53))
@@ -350,7 +452,7 @@ while True:
       leng=len(data_recv)
       print("lenght ="+str(leng))
       sendToAlice(data_recv,data,leng)
-      print("-> envoie reponse to alice")
+      print("-> envoie reponse to alice\n")
 
       data.close()
 
@@ -414,9 +516,13 @@ while True:
       print("\n----------------------------------------------\n")
       if data_answer!="null":
         print("\n A STOCKE : "+name_bdd+"\t"+numbertotype(typ_bdd)+"  "+str(clas_bdd)+"\t"+str(data_answer)+"\n")
+        stock(name_bdd, typ_bdd, clas_bdd, data_answer)
       print("\n----------------------------------------------\n")
+      
+      t.close()
+    
+    print ("\n|-------------------------|\n|                         |\n|        THE END !        |\n|                         |\n|-------------------------|")
 
-
-
-    t.close()
+    print("\n\n---------------------------------------------------------------------------\n")
+    print ("\nPROXY doh to dns : Lance en ecoute sur le port 80\n") 
     
