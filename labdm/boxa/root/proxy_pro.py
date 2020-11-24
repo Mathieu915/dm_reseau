@@ -261,7 +261,8 @@ def Isknown(name, typ):
         typee = ligne.split('\t')[1].split('  ')[1]
         clas = ligne.split('\t')[1].split('  ')[0]
         result = ligne.split('\t')[2]
-
+        
+        #print('>'+domain+'<=>'+name+'< ; >'+typee+'<=>'+typ+'<')
         if domain == name and typee == typ:
             return (True, domain, clas, typee, result)
         else:
@@ -276,10 +277,12 @@ def stock(name, typ, clas, data):
     file = open('/etc/bind/db.static', 'a')
     if typ == 1: # A
         file.write(name + '\t' + numbertoclas(clas) + '  ' + numbertotype(typ) + '\t' + str(data) + '\n')
-    elif typ == 15 or typ == 2: # MX ou NS
+    elif typ == 15: # MX 
         preference=data[0]
         answer=data[1]
         file.write(name + '\t' + numbertoclas(clas) + '  ' + numbertotype(typ) + '\t' + str(preference) + ' ' + str(answer) + '\n')
+    elif typ == 2: # NS
+        file.write(name + '\t' + numbertoclas(clas) + '  ' + numbertotype(typ) + '\t' + str(data) + '\n')
     else:
         pass
     file.close()
@@ -332,14 +335,14 @@ def contructDnsReplyTypA(domain, clas, typ, result):
     data = data + struct.pack('>H', clasnumber(clas))
 
     # DONNES
-    data += struct.pack('>HHHIH4B', 0xc00c, typenumber(typ), clasnumber(clas), 86400, 4, *(int(x) for x in result.split('.')) )
+    data += struct.pack('>HHHIH4B', 0xc00c, typenumber(typ), clasnumber(clas), 60000, 4, *(int(x) for x in result.split('.')) )
     
 
     print ('\n\tsortie : contructDnsRequest : DATA= ' + str(data) + '\n')
     return data
 
 
-def contructDnsReplyTypMX(domain, clas, typ, result, pref):
+def contructDnsReplyTypMX(domain, clas, typ, result, pref, add):
     """"""
 
     print('\n\tenter : contructDnsReplyMX')
@@ -362,7 +365,7 @@ def contructDnsReplyTypMX(domain, clas, typ, result, pref):
     data = data + struct.pack('>H', 0)  # ToDo quand type = NS ou MX
 
   # ARcount su 2 octets
-    data = data + struct.pack('>H', 0)  # ToDo quand type = NS ou MX
+    data = data + struct.pack('>H', add)  # ToDo quand type = NS ou MX
 
     nb_octet = 12
 
@@ -386,7 +389,7 @@ def contructDnsReplyTypMX(domain, clas, typ, result, pref):
 
     # DONNES
     data_len=2+len(result.split('.')[0])+1+2
-    data = data + struct.pack('>HHHIHH', 0xc00c, typenumber(typ), clasnumber(clas), 86400, data_len, pref )
+    data = data + struct.pack('>HHHIHH', 0xc00c, typenumber(typ), clasnumber(clas), 60000, data_len, pref )
 
     data = data + struct.pack('B', len(result.split('.')[0]))
     for char in result.split('.')[0]:
@@ -395,6 +398,14 @@ def contructDnsReplyTypMX(domain, clas, typ, result, pref):
 
     print ('\n\tsortie : contructDnsRequestMX : DATA= ' + str(data) + '\n')
     return data
+
+
+def contructDnsReplyTypMXAdd(clas_add, typee_add, result_add):
+    """"""
+
+    #0xc028 car vus sur le wireshark
+    return struct.pack('>HHHIH4B', 0xc028, typenumber(typee_add), clasnumber(clas_add), 60000, 4, *(int(x) for x in result_add.split('.')) )
+
 
 
 i = 12
@@ -459,44 +470,42 @@ def infoToStock(data,qdcount,ancount,nscount,arcount):
     if qdcount:
         print('QUERY SECTION :\n')
         for j in range(qdcount):
-            (pos, name, typ, clas) = retrquest(data, i)
+            (pos, name_answer, typ_answer, clas_answer) = retrquest(data, i)
             i = pos
-            name_bdd = name
-            typ_bdd = typ
-            clas_bdd = clas
-            print (name + '   ' + numbertotype(typ) + '   ' + str(clas))
+            print (name_answer + '   ' + numbertotype(typ_answer) + '   ' + str(clas_answer))
         print ('\n')
 
     if ancount:
         print('ANSWER SECTION :\n')
         for j in range(ancount):
-            (pos,name,typ,clas,ttl,datalen,dat) = retrrr(data, i)
+            (pos,name,typ,clas,ttl,datalen,data_answer) = retrrr(data, i)
             i = pos
             if typ == 15:
-                print(name + '   ' + numbertotype(typ) + '   ' + str(clas) + '   ' + str(ttl) + '   ' + str(dat[0]) + '   ' + dat[1])
+                print(name + '   ' + numbertotype(typ) + '   ' + str(clas) + '   ' + str(ttl) + '   ' + str(data_answer[0]) + '   ' + data_answer[1])
             else:
-                print(name + '   ' + numbertotype(typ) + '   ' + str(clas) + '   ' + str(ttl) + '   ' + str(dat))
+                print(name + '   ' + numbertotype(typ) + '   ' + str(clas) + '   ' + str(ttl) + '   ' + str(data_answer))
         print ('\n')
-        data_answer = dat
 
     if nscount:
         print('AUTHORITY SECTION :\n')
         for j in range(nscount):
-            (pos,name,typ,clas,ttl,datalen,dat) = retrrr(data, i)
+            (pos,name_authority,typ_authority,clas_authority,ttl,datalen,data_authority) = retrrr(data, i)
             i = pos
-            print ('...')
+            print ('...... data_autorytity = >'+data_authority+'<')
             # print(name+"   "+numbertotype(typ)+"   "+str(clas)+"   "+str(ttl)+"   "+"str(dat)=...")
+        stock(name_authority, typ_authority, clas_authority, data_authority)
         print ('\n')
 
     if arcount:
         print ('ADDITIONAL SECTION :\n')
         for j in range(arcount):
-            (pos,name,typ,clas,ttl,datalen,dat,) = retrrr(data, i)
+            (pos,name_additional,typ_additional,clas_additional,ttl,datalen,data_additional,) = retrrr(data, i)
             i = pos
-            print(name + '   ' + numbertotype(typ) + '   ' + str(clas) + '   ' + str(ttl) + '   ' + str(dat))
+            print(name_additional + '   ' + numbertotype(typ_additional) + '   ' + str(clas_additional) + '   ' + str(ttl) + '   ' + str(data_additional))
+        stock(name_additional, typ_additional, clas_additional, data_additional)
         print ('\n')
     
-    return (name_bdd, typ_bdd, clas_bdd, data_answer)
+    return (name_answer, typ_answer, clas_answer, data_answer)
 
 
 
@@ -529,9 +538,23 @@ while True:
             requete_dns = contructDnsReplyTypA(domain, clas, typee, result)
         elif typee=='MX':
             pref=int(result.split(' ')[0])
-            result=result.split(' ')[1]
-            requete_dns = contructDnsReplyTypMX(domain, clas, typee, result, pref)
-        else: #typee=='NS':
+            result=result.split(' ')[1][:-1]
+
+            # recher si dans le cache partie additional
+            print("recherche add ? >"+str(result)+'< '+numbertotype(1))
+            (is_known_add, domain_add, clas_add, typee_add, result_add) = Isknown(str(result),'A')
+            if is_known_add:
+                print('>oui')
+                add=1
+                requete_dns = contructDnsReplyTypMX(domain, clas, typee, result, pref, add)
+                requete_dns = requete_dns + contructDnsReplyTypMXAdd(clas_add, typee_add, result_add)
+            else :
+                add=0
+                requete_dns = contructDnsReplyTypMX(domain, clas, typee, result, pref, add)
+        elif typee=='NS':
+            # ToDo : comme pr MX
+            pass
+        else: 
             pass
         
         leng = len(requete_dns)
@@ -584,11 +607,13 @@ while True:
       # Affichage de la reponse, section par section
         print ('QUERY: ' + str(qdcount) + ', ANSWER: ' + str(ancount) + ', AUTHORITY: ' + str(nscount) + ', ADDITIONAL: ' + str(arcount) + '\n')
 
-        (name_bdd, typ_bdd, clas_bdd, data_answer) = infoToStock(data,qdcount,ancount,nscount,arcount)
+        (name_answer, typ_answer, clas_answer, data_answer) = infoToStock(data,qdcount,ancount,nscount,arcount)
 
         if data_answer != 'null':
-            print('\n A STOCKE : ' + name_bdd + '\t' + numbertotype(typ_bdd) + '  ' + str(clas_bdd) + '\t' + str(data_answer) + '\n')
-            stock(name_bdd, typ_bdd, clas_bdd, data_answer)
+            print('\n A STOCKE : ' + name_answer + '\t' + numbertotype(typ_answer) + '  ' + str(clas_answer) + '\t' + str(data_answer) + '\n')
+            stock(name_answer, typ_answer, clas_answer, data_answer)
+
+            
 
         t.close()
         printTheEnd()
