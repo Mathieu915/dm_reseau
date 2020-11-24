@@ -274,21 +274,19 @@ def stock(name, typ, clas, data):
     """"""
 
     file = open('/etc/bind/db.static', 'a')
-    if clas == 1:
-        file.write(name + '\t' + 'IN' + '  ' + numbertotype(typ) + '\t' + str(data) + '\n')
-    elif clas == 2:
-        file.write(name + '\t' + 'CS' + '  ' + numbertotype(typ) + '\t' + str(data) + '\n')
-    elif clas == 3:
-        file.write(name + '\t' + 'CH' + '  ' + numbertotype(typ) + '\t' + str(data) + '\n')
-    elif clas == 4:
-        file.write(name + '\t' + 'HS' + '  ' + numbertotype(typ) + '\t' + str(data) + '\n')
+    if typ == 1: # A
+        file.write(name + '\t' + numbertoclas(clas) + '  ' + numbertotype(typ) + '\t' + str(data) + '\n')
+    elif typ == 15 or typ == 2: # MX ou NS
+        preference=data[0]
+        answer=data[1]
+        file.write(name + '\t' + numbertoclas(clas) + '  ' + numbertotype(typ) + '\t' + str(preference) + ' ' + str(answer) + '\n')
     else:
         pass
     file.close()
 
 
 
-def contructDnsReply(domain, clas, typ, result):
+def contructDnsReplyTypA(domain, clas, typ, result):
     """"""
 
     print('\n\tenter : contructDnsReply')
@@ -340,6 +338,63 @@ def contructDnsReply(domain, clas, typ, result):
     print ('\n\tsortie : contructDnsRequest : DATA= ' + str(data) + '\n')
     return data
 
+
+def contructDnsReplyTypMX(domain, clas, typ, result, pref):
+    """"""
+
+    print('\n\tenter : contructDnsReplyMX')
+
+    data = ""
+
+  # id sur 2 octets
+    data = data + struct.pack('>H', 0)
+
+  # flag 2 octet 
+    data = data + struct.pack('>H', 0x8180)
+
+  # QDCOUNT sur 2 octets
+    data = data + struct.pack('>H', 1)
+
+  # ANCOUNT sur 2 octets
+    data = data + struct.pack('>H', 1)
+
+  # NScount su 2 octets
+    data = data + struct.pack('>H', 0)  # ToDo quand type = NS ou MX
+
+  # ARcount su 2 octets
+    data = data + struct.pack('>H', 0)  # ToDo quand type = NS ou MX
+
+    nb_octet = 12
+
+  # non de domaine su x octets
+    splitname = domain.split('.')
+    for c in splitname:
+        data = data + struct.pack('B', len(c))
+        nb_octet = nb_octet + 1
+        for l in c:
+            data = data + struct.pack('c', l)
+            nb_octet = nb_octet + 1
+
+  # 1 octet = 00 pr dire la fin du nom de dommaine
+    data = data + struct.pack('B', 0)
+
+  # TYPE
+    data = data + struct.pack('>H', typenumber(typ))
+
+  # CLASS
+    data = data + struct.pack('>H', clasnumber(clas))
+
+    # DONNES
+    data_len=2+len(result.split('.')[0])+1+2
+    data = data + struct.pack('>HHHIHH', 0xc00c, typenumber(typ), clasnumber(clas), 86400, data_len, pref )
+
+    data = data + struct.pack('B', len(result.split('.')[0]))
+    for char in result.split('.')[0]:
+        data = data + struct.pack('c', char)
+    data = data + struct.pack('>H', 0xc00c)
+
+    print ('\n\tsortie : contructDnsRequestMX : DATA= ' + str(data) + '\n')
+    return data
 
 
 i = 12
@@ -464,15 +519,23 @@ while True:
     print ('\nRequete : ' + name + '\t' + numbertoclas(clas) + '  ' + numbertotype(typ) + '\n')
 
     (is_known, domain, clas, typee, result) = Isknown(name,numbertotype(typ))
+    print("iskown result : "+result)
 
     test = 0
     if is_known and test == 0:
         print ('db.static : ' + domain + '\t' + clas + '  ' + typee + '\t' + result)
 
-        requete_dns = contructDnsReply(domain, clas, typee, result)
+        if typee=='A':
+            requete_dns = contructDnsReplyTypA(domain, clas, typee, result)
+        elif typee=='MX':
+            pref=int(result.split(' ')[0])
+            result=result.split(' ')[1]
+            requete_dns = contructDnsReplyTypMX(domain, clas, typee, result, pref)
+        else: #typee=='NS':
+            pass
+        
         leng = len(requete_dns)
         print('\n\n=====>len req cree ='+str(leng))
-
         sendToAlice(requete_dns, data, leng)
 
         print ('\n/-------------------------\              |~~\_____/~~\__  |')
