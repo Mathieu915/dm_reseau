@@ -6,7 +6,7 @@
 #	Titre : PROXY doh to dns
 #   URL   : https://github.com/Mathieu915/dm_reseau
 #   Date édition     : 10/11/2020  
-#   Date mise à jour : 20/11/2020 
+#   Date mise à jour : 24/11/2020 
 #   Rapport de la maj :
 #   	- ...
 #	
@@ -69,7 +69,7 @@ def ctlProtocolGet(protocol):
         if protocol != 'GET':
             raise ProtocolNotGet("Protocole n'est pas GET")
     except ProtocolNotGet:
-        print 'Protocole utiniser est incorect, le seul autorise est GET'
+        print('Protocole utiniser est incorect, le seul autorise est GET')
 
 
 def ctlVariableDns(var):
@@ -78,7 +78,7 @@ def ctlVariableDns(var):
         if var != 'dns':
             raise VariableNotDns("Variable n'est pas dns")
     except VariableNotDns:
-        print 'La variable est incorect, la seul autorise est dns'
+        print('La variable est incorect, la seul autorise est dns')
 
 
 def getNameDomaine(data):
@@ -287,6 +287,7 @@ def stock(name, typ, clas, data):
     file.close()
 
 
+
 def contructDnsReply(domain, clas, typ, result):
     """"""
 
@@ -295,37 +296,26 @@ def contructDnsReply(domain, clas, typ, result):
     data = ""
 
   # id sur 2 octets
-
     data = data + struct.pack('>H', 0)
 
-  # octet suivant : Recursion Desired
-
-    data = data + struct.pack('B', 1)
-
-  # octet suivant : 0
-
-    data = data + struct.pack('B', 0)
+  # flag 2 octet 
+    data = data + struct.pack('>H', 0x8180)
 
   # QDCOUNT sur 2 octets
-
     data = data + struct.pack('>H', 1)
 
   # ANCOUNT sur 2 octets
-
     data = data + struct.pack('>H', 1)
 
   # NScount su 2 octets
-
     data = data + struct.pack('>H', 0)  # ToDo quand type = NS ou MX
 
   # ARcount su 2 octets
-
     data = data + struct.pack('>H', 0)  # ToDo quand type = NS ou MX
 
     nb_octet = 12
 
   # non de domaine su x octets
-
     splitname = domain.split('.')
     for c in splitname:
         data = data + struct.pack('B', len(c))
@@ -335,46 +325,21 @@ def contructDnsReply(domain, clas, typ, result):
             nb_octet = nb_octet + 1
 
   # 1 octet = 00 pr dire la fin du nom de dommaine
-
     data = data + struct.pack('B', 0)
 
   # TYPE
-
     data = data + struct.pack('>H', typenumber(typ))
 
   # CLASS
-
     data = data + struct.pack('>H', clasnumber(clas))
 
-  # ttl sur 2 octet
-
-    data = data + struct.pack('>H', 0)
-    data = data + struct.pack('H', 60)
-
-    nb_octet = nb_octet + 6  # en comptant l'octet de la longueur
-
-  # splitip1=result.split('.')
-  # for x in splitip1:
-  #   nb_octet=nb_octet+1
-
-    print ('longueur ====>' + str(nb_octet))
-
-  # longueur 1 octet
-
-    data = data + struct.pack('>B', nb_octet)
-
-  # data sur x octet
-
-    splitip = result.split('.')
-    for x in splitip:
-        data = data + struct.pack('>H', int(x))
-    data = data + struct.pack('>H', 0)
-    data = data + struct.pack('>H', 0)
-    data = data + struct.pack('>H', 0)
-    data = data + struct.pack('>H', 0)
+    # DONNES
+    data += struct.pack('>HHHIH4B', 0xc00c, typenumber(typ), clasnumber(clas), 86400, 4, *(int(x) for x in result.split('.')) )
+    
 
     print ('\n\tsortie : contructDnsRequest : DATA= ' + str(data) + '\n')
     return data
+
 
 
 i = 12
@@ -445,7 +410,7 @@ def infoToStock(data,qdcount,ancount,nscount,arcount):
             typ_bdd = typ
             clas_bdd = clas
             print (name + '   ' + numbertotype(typ) + '   ' + str(clas))
-        print '\n'
+        print ('\n')
 
     if ancount:
         print('ANSWER SECTION :\n')
@@ -456,7 +421,7 @@ def infoToStock(data,qdcount,ancount,nscount,arcount):
                 print(name + '   ' + numbertotype(typ) + '   ' + str(clas) + '   ' + str(ttl) + '   ' + str(dat[0]) + '   ' + dat[1])
             else:
                 print(name + '   ' + numbertotype(typ) + '   ' + str(clas) + '   ' + str(ttl) + '   ' + str(dat))
-        print '\n'
+        print ('\n')
         data_answer = dat
 
     if nscount:
@@ -464,9 +429,9 @@ def infoToStock(data,qdcount,ancount,nscount,arcount):
         for j in range(nscount):
             (pos,name,typ,clas,ttl,datalen,dat) = retrrr(data, i)
             i = pos
-            print '...'
+            print ('...')
             # print(name+"   "+numbertotype(typ)+"   "+str(clas)+"   "+str(ttl)+"   "+"str(dat)=...")
-        print '\n'
+        print ('\n')
 
     if arcount:
         print ('ADDITIONAL SECTION :\n')
@@ -474,7 +439,7 @@ def infoToStock(data,qdcount,ancount,nscount,arcount):
             (pos,name,typ,clas,ttl,datalen,dat,) = retrrr(data, i)
             i = pos
             print(name + '   ' + numbertotype(typ) + '   ' + str(clas) + '   ' + str(ttl) + '   ' + str(dat))
-        print '\n'
+        print ('\n')
     
     return (name_bdd, typ_bdd, clas_bdd, data_answer)
 
@@ -505,8 +470,9 @@ while True:
         print ('db.static : ' + domain + '\t' + clas + '  ' + typee + '\t' + result)
 
         requete_dns = contructDnsReply(domain, clas, typee, result)
+        leng = len(requete_dns)
+        print('\n\n=====>len req cree ='+str(leng))
 
-        leng = 90
         sendToAlice(requete_dns, data, leng)
 
         print ('\n/-------------------------\              |~~\_____/~~\__  |')
