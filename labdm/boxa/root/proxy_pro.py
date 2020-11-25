@@ -255,6 +255,10 @@ def Isknown(name, typ):
     file.close()
 
   # ['www.lexique.com\tIN  A\t9.9.9.9\n', 'cold.net\tIN  MX\t5 smtp.cold.net\n', 'smtp.cold.net\tIN  A\t213.186.33.5\n']
+    # file = open('/etc/bind/db.static', 'r')
+    # print(file.readlines())
+    # file.close()
+
 
     for ligne in tab:
         domain = ligne.split('\t')[0]
@@ -400,12 +404,77 @@ def contructDnsReplyTypMX(domain, clas, typ, result, pref, add):
     return data
 
 
+
+def contructDnsReplyTypNS(domain, clas, typ, result, add):
+    """"""
+
+    print('\n\tenter : contructDnsReplyNS')
+
+    data = ""
+
+  # id sur 2 octets
+    data = data + struct.pack('>H', 0)
+
+  # flag 2 octet 
+    data = data + struct.pack('>H', 0x8180)
+
+  # QDCOUNT sur 2 octets
+    data = data + struct.pack('>H', 1)
+
+  # ANCOUNT sur 2 octets
+    data = data + struct.pack('>H', 1)
+
+  # NScount su 2 octets
+    data = data + struct.pack('>H', 0)  # ToDo quand type = NS ou MX
+
+  # ARcount su 2 octets
+    data = data + struct.pack('>H', add)  # ToDo quand type = NS ou MX
+
+    nb_octet = 12
+
+  # non de domaine su x octets
+    splitname = domain.split('.')
+    for c in splitname:
+        data = data + struct.pack('B', len(c))
+        nb_octet = nb_octet + 1
+        for l in c:
+            data = data + struct.pack('c', l)
+            nb_octet = nb_octet + 1
+
+  # 1 octet = 00 pr dire la fin du nom de dommaine
+    data = data + struct.pack('B', 0)
+
+  # TYPE
+    data = data + struct.pack('>H', typenumber(typ))
+
+  # CLASS
+    data = data + struct.pack('>H', clasnumber(clas))
+
+    # DONNES
+    data_len=2+len(result.split('.')[0])+1+2
+    data = data + struct.pack('>HHHIH', 0xc00c, typenumber(typ), clasnumber(clas), 60000, data_len )
+
+    data = data + struct.pack('B', len(result.split('.')[0]))
+    for char in result.split('.')[0]:
+        data = data + struct.pack('c', char)
+    data = data + struct.pack('>H', 0xc00c)
+
+    print ('\n\tsortie : contructDnsRequestNS : DATA= ' + str(data) + '\n')
+    return data
+
+
 def contructDnsReplyTypMXAdd(clas_add, typee_add, result_add):
     """"""
 
     #0xc028 car vus sur le wireshark
     return struct.pack('>HHHIH4B', 0xc028, typenumber(typee_add), clasnumber(clas_add), 60000, 4, *(int(x) for x in result_add.split('.')) )
 
+
+def contructDnsReplyTypNSAdd(clas_add, typee_add, result_add):
+    """"""
+
+    #0xc028 car vus sur le wireshark
+    return struct.pack('>HHHIH4B', 0xc028, typenumber(typee_add), clasnumber(clas_add), 60000, 4, *(int(x) for x in result_add.split('.')) )
 
 
 i = 12
@@ -539,6 +608,7 @@ while True:
         elif typee=='MX':
             pref=int(result.split(' ')[0])
             result=result.split(' ')[1][:-1]
+            add=0
 
             # recher si dans le cache partie additional
             print("recherche add ? >"+str(result)+'< '+numbertotype(1))
@@ -549,11 +619,21 @@ while True:
                 requete_dns = contructDnsReplyTypMX(domain, clas, typee, result, pref, add)
                 requete_dns = requete_dns + contructDnsReplyTypMXAdd(clas_add, typee_add, result_add)
             else :
-                add=0
                 requete_dns = contructDnsReplyTypMX(domain, clas, typee, result, pref, add)
         elif typee=='NS':
-            # ToDo : comme pr MX
-            pass
+            print("recherche add NS ? >"+str(result)+'< '+numbertotype(1))
+            result=result[:-1]
+            add=0
+            (is_known_add, domain_add, clas_add, typee_add, result_add) = Isknown(str(result),'A')
+            if is_known_add: 
+                print('>oui = '+result_add)
+                #add=1
+                requete_dns = contructDnsReplyTypNS(domain, clas, typee, result, add)
+
+                # pb dans la construction du contructDnsReplyTypNSAdd
+                #requete_dns = requete_dns + contructDnsReplyTypNSAdd(clas_add, typee_add, result_add)
+            else :
+                requete_dns = contructDnsReplyTypNS(domain, clas, typee, result, add)
         else: 
             pass
         
@@ -618,4 +698,14 @@ while True:
         t.close()
         printTheEnd()
 
-	
+
+
+
+
+##
+#  	
+#	
+#
+#
+#
+##
