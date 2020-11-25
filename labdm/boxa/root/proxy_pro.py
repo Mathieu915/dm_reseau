@@ -6,14 +6,14 @@
 #	Titre : PROXY doh to dns
 #   URL   : https://github.com/Mathieu915/dm_reseau
 #   Date édition     : 10/11/2020  
-#   Date mise à jour : 24/11/2020 
+#   Date mise à jour : 25/11/2020 
 #   Rapport de la maj :
 #   	- ...
 #	
 #	ToDo :
-#		- envoie rep a Alice deuis le cache
-# 		- gestion de la rep a Alice depuis le cache quand requete dns est MX et NS
+# 		- section additional quand rep depuis cache typ=NS
 #  		- toute les def de fonction
+#       - compression des noms de domaine dans db.static
 ##
 
 print("\n\n")
@@ -560,9 +560,8 @@ def infoToStock(data,qdcount,ancount,nscount,arcount):
         for j in range(nscount):
             (pos,name_authority,typ_authority,clas_authority,ttl,datalen,data_authority) = retrrr(data, i)
             i = pos
-            print ('...... data_autorytity = >'+data_authority+'<')
+            #print ('...... data_autorytity = >'+data_authority+'<')
             # print(name+"   "+numbertotype(typ)+"   "+str(clas)+"   "+str(ttl)+"   "+"str(dat)=...")
-        stock(name_authority, typ_authority, clas_authority, data_authority)
         print ('\n')
 
     if arcount:
@@ -571,9 +570,14 @@ def infoToStock(data,qdcount,ancount,nscount,arcount):
             (pos,name_additional,typ_additional,clas_additional,ttl,datalen,data_additional,) = retrrr(data, i)
             i = pos
             print(name_additional + '   ' + numbertotype(typ_additional) + '   ' + str(clas_additional) + '   ' + str(ttl) + '   ' + str(data_additional))
-        stock(name_additional, typ_additional, clas_additional, data_additional)
         print ('\n')
     
+    if data_answer != 'null':
+        if nscount:
+            stock(name_authority, typ_authority, clas_authority, data_authority)
+        if arcount:    
+            stock(name_additional, typ_additional, clas_additional, data_additional)
+
     return (name_answer, typ_answer, clas_answer, data_answer)
 
 
@@ -703,8 +707,18 @@ while True:
 
 
 ##
-#  	
+#   TEST :  	
 #	
+# 1)   ./senddns.py -t A www.perdu.com
+#      ---> ... 
+#
+# 2)   ./senddns.py -t MX cold.net
+#      ---> IspA : OK Question/Answer/Autority/Additional
+#      ---> Cache : OK Question/Answer/Additional
+#
+# 3)   ./senddns.py -t NS cold.net
+#      ---> IspA : OK Question/Answer
+#      ---> Cache : OK Question/Answer
 #
 #
 #
