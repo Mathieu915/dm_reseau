@@ -6,7 +6,7 @@
 #	Titre : PROXY doh to dns
 #   URL   : https://github.com/Mathieu915/dm_reseau
 #   Date édition     : 10/11/2020  
-#   Date mise à jour : 25/11/2020 
+#   Date mise à jour : 27/11/2020 
 #   Rapport de la maj :
 #   	- ...
 #	
@@ -24,77 +24,47 @@ print("               & thomas.chevalier1@etu.univ-orleans.fr")
 print("Web:           https://github.com/Mathieu915/dm_reseau")
 print("Description:   ")
 print("     Proxy DOH to DNS")
+print("     /!\ Parie bonus : on a implementé l'ajout de nouveaux enregistrement dans le cache (=/etc/bind/db.static)... ")
 print("\n====================================================================")
 
 
 from socket import *
-from select import select
-from sys import argv
 import base64
 import struct
 
-# Socket TCT pour une liaison avec Alice
+# Socket TCP pour une liaison avec Alice
 s = socket(AF_INET, SOCK_STREAM)
-s.bind(('0.0.0.0', 80))
+s.bind(('0.0.0.0', 80)) 
 s.listen(3)
+
 
 print ("\n\n+-----------------------------------+\n|                                   |\n|         PROXY : Listen 80         |\n|                                   |\n+-----------------------------------+\n\n")
 
 
-
-
 ###############################
 #                             #
-#         Exception           #
+#    Exception/code erreur    #
 #                             #
 ###############################
 
 class ProtocolNotGet(Exception):
+    #code erreur: 801 : Le protocole est incorect, le seul autorise est GET.
     pass
-
 
 class VariableNotDns(Exception):
+    #code erreur: 802 : La variable est incorect, la seul autorise est dns.
+    pass
+
+class CannotIdentifyProtocol(Exception):
+    #code erreur: 803 : Le protocole n'est pas identifiable.
     pass
 
 
 ###############################
 #                             #
-#        Def fonction         #
+#     Def fonction : PROF     #     c'est les fonctions du clien que l'on repri mais pas modifié
 #                             #
 ###############################
-
-def ctlProtocolGet(protocol):
-    """Verifie que le protocole soit bien du GET"""
-    try:
-        if protocol != 'GET':
-            raise ProtocolNotGet("Protocole n'est pas GET")
-    except ProtocolNotGet:
-        print('Protocole utiniser est incorect, le seul autorise est GET')
-
-
-def ctlVariableDns(var):
-    """Verifie que la variable soit dns"""
-    try:
-        if var != 'dns':
-            raise VariableNotDns("Variable n'est pas dns")
-    except VariableNotDns:
-        print('La variable est incorect, la seul autorise est dns')
-
-
-def getNameDomaine(data):
-    """Retourner le nom de dommaine"""
-
-    header = struct.unpack('>HBBHHHH', data[:12])
-    qdcount = header[3]
-    ancount = header[4]
-    nscount = header[5]
-    arcount = header[6]
-
-    (pos, name, typ, clas) = retrquest(data, 12)
-    pos = 12
-
-    return (name, typ, clas)
-
 
 def retrquest(string, pos):
     """decrit une section question presente dans la reponse DNS string a la position pos"""
@@ -106,7 +76,6 @@ def retrquest(string, pos):
     clas = struct.unpack('>H', string[p:p + 2])[0]
     p = p + 2
     return (p, name, typ, clas)
-
 
 def getname(string, pos):
     """recupere le nom de domaine encode dans une reponse DNS a la position p, en lecture directe ou en compression"""
@@ -134,7 +103,6 @@ def getname(string, pos):
         p = save + 2
     return (p, name)
 
-
 def tupletostring(t):
     """concatene un tuple de chaines de caracteres en une seule chaine"""
 
@@ -142,7 +110,6 @@ def tupletostring(t):
     for c in t:
         s = s + c
     return s
-
 
 def numbertotype(typ):
     """associe son type a un entier"""
@@ -163,335 +130,50 @@ def typenumber(typ):
     if typ == 'NS':
         return 2
 
-
-def clasnumber(clas):
-    """associe un entier a un nom une classe"""
-    if clas == 'IN':
-        return 1
-    if clas == 'CS':
-        return 2
-    if clas == 'CH':
-        return 3
-    if clas == 'HS':
-        return 4
-
-
-def numbertoclas(clas):
-    """associe un entier a un nom une classe"""
-    if clas == 1:
-        return 'IN'
-    if clas == 2:
-        return 'CS'
-    if clas == 3:
-        return 'CH'
-    if clas == 4:
-        return 'HS'
-
-
+# copie de dnsrequete(name, typ)
 def contructDnsRequest(name, typ):
-    """"contruction de la requet dns"""
+    """"construction de la requete demandant les enregistrements de type typ pour le nom de domaine name"""
 
     data = ""
 
-  # id sur 2 octets
-
+    # id sur 2 octets
     data = data + struct.pack('>H', 0)
 
-  # octet suivant : Recursion Desired
-
+    # octet suivant : Recursion Desired
     data = data + struct.pack('B', 1)
 
-  # octet suivant : 0
-
+    # octet suivant : 0
     data = data + struct.pack('B', 0)
 
-  # QDCOUNT sur 2 octets
-
+    # QDCOUNT sur 2 octets : question 
     data = data + struct.pack('>H', 1)
 
+    # pas les autres champs, car question
     data = data + struct.pack('>H', 0)
     data = data + struct.pack('>H', 0)
     data = data + struct.pack('>H', 0)
 
+    # decoupage du nom de domaine selon les '.'
     splitname = name.split('.')
     for c in splitname:
-        data = data + struct.pack('B', len(c))
+        data = data + struct.pack('B', len(c)) # on dit de combien de character est le prochain mot
         for l in c:
-            data = data + struct.pack('c', l)
+            data = data + struct.pack('c', l) # ajoute à data le charactere c codé en octet
 
+    # fin de l'ecriture du nom de domaine
     data = data + struct.pack('B', 0)
 
-  # TYPE
-
+    # type sous le format numerique
     data = data + struct.pack('>H', typenumber(typ))
 
-  # CLASS 1 (IN) par defaut
-
+    # CLASS 1 (IN) par defaut
     data = data + struct.pack('>H', 1)
-
-  # ttp sur 2 octet
-
-  # longueur 1 octet
-
-  # data sur x octet
 
     return data
 
-
-def sendToAlice(data, s, leng):
-    """"""
-    s.send("""HTTP/1.0 200 OK
-Content-Type: application/dns-message
-Content-Length: %s
-
-%s
-"""
-           % (leng, data))
-
-
-def Isknown(name, typ):
-    file = open('/etc/bind/db.static', 'r')
-    tab = file.readlines()
-    file.close()
-
-  # ['www.lexique.com\tIN  A\t9.9.9.9\n', 'cold.net\tIN  MX\t5 smtp.cold.net\n', 'smtp.cold.net\tIN  A\t213.186.33.5\n']
-    # file = open('/etc/bind/db.static', 'r')
-    # print(file.readlines())
-    # file.close()
-
-
-    for ligne in tab:
-        domain = ligne.split('\t')[0]
-        typee = ligne.split('\t')[1].split('  ')[1]
-        clas = ligne.split('\t')[1].split('  ')[0]
-        result = ligne.split('\t')[2]
-        
-        #print('>'+domain+'<=>'+name+'< ; >'+typee+'<=>'+typ+'<')
-        if domain == name and typee == typ:
-            return (True, domain, clas, typee, result)
-        else:
-            pass
-
-    return (False, """""", """""", """""", """""")
-
-
-def stock(name, typ, clas, data):
-    """"""
-
-    file = open('/etc/bind/db.static', 'a')
-    if typ == 1: # A
-        file.write(name + '\t' + numbertoclas(clas) + '  ' + numbertotype(typ) + '\t' + str(data) + '\n')
-    elif typ == 15: # MX 
-        preference=data[0]
-        answer=data[1]
-        file.write(name + '\t' + numbertoclas(clas) + '  ' + numbertotype(typ) + '\t' + str(preference) + ' ' + str(answer) + '\n')
-    elif typ == 2: # NS
-        file.write(name + '\t' + numbertoclas(clas) + '  ' + numbertotype(typ) + '\t' + str(data) + '\n')
-    else:
-        pass
-    file.close()
-
-
-
-def contructDnsReplyTypA(domain, clas, typ, result):
-    """"""
-
-    print('\n\tenter : contructDnsReply')
-
-    data = ""
-
-  # id sur 2 octets
-    data = data + struct.pack('>H', 0)
-
-  # flag 2 octet 
-    data = data + struct.pack('>H', 0x8180)
-
-  # QDCOUNT sur 2 octets
-    data = data + struct.pack('>H', 1)
-
-  # ANCOUNT sur 2 octets
-    data = data + struct.pack('>H', 1)
-
-  # NScount su 2 octets
-    data = data + struct.pack('>H', 0)  # ToDo quand type = NS ou MX
-
-  # ARcount su 2 octets
-    data = data + struct.pack('>H', 0)  # ToDo quand type = NS ou MX
-
-    nb_octet = 12
-
-  # non de domaine su x octets
-    splitname = domain.split('.')
-    for c in splitname:
-        data = data + struct.pack('B', len(c))
-        nb_octet = nb_octet + 1
-        for l in c:
-            data = data + struct.pack('c', l)
-            nb_octet = nb_octet + 1
-
-  # 1 octet = 00 pr dire la fin du nom de dommaine
-    data = data + struct.pack('B', 0)
-
-  # TYPE
-    data = data + struct.pack('>H', typenumber(typ))
-
-  # CLASS
-    data = data + struct.pack('>H', clasnumber(clas))
-
-    # DONNES
-    data += struct.pack('>HHHIH4B', 0xc00c, typenumber(typ), clasnumber(clas), 60000, 4, *(int(x) for x in result.split('.')) )
-    
-
-    print ('\n\tsortie : contructDnsRequest : DATA= ' + str(data) + '\n')
-    return data
-
-
-def contructDnsReplyTypMX(domain, clas, typ, result, pref, add):
-    """"""
-
-    print('\n\tenter : contructDnsReplyMX')
-
-    data = ""
-
-  # id sur 2 octets
-    data = data + struct.pack('>H', 0)
-
-  # flag 2 octet 
-    data = data + struct.pack('>H', 0x8180)
-
-  # QDCOUNT sur 2 octets
-    data = data + struct.pack('>H', 1)
-
-  # ANCOUNT sur 2 octets
-    data = data + struct.pack('>H', 1)
-
-  # NScount su 2 octets
-    data = data + struct.pack('>H', 0)  # ToDo quand type = NS ou MX
-
-  # ARcount su 2 octets
-    data = data + struct.pack('>H', add)  # ToDo quand type = NS ou MX
-
-    nb_octet = 12
-
-  # non de domaine su x octets
-    splitname = domain.split('.')
-    for c in splitname:
-        data = data + struct.pack('B', len(c))
-        nb_octet = nb_octet + 1
-        for l in c:
-            data = data + struct.pack('c', l)
-            nb_octet = nb_octet + 1
-
-  # 1 octet = 00 pr dire la fin du nom de dommaine
-    data = data + struct.pack('B', 0)
-
-  # TYPE
-    data = data + struct.pack('>H', typenumber(typ))
-
-  # CLASS
-    data = data + struct.pack('>H', clasnumber(clas))
-
-    # DONNES
-    data_len=2+len(result.split('.')[0])+1+2
-    data = data + struct.pack('>HHHIHH', 0xc00c, typenumber(typ), clasnumber(clas), 60000, data_len, pref )
-
-    data = data + struct.pack('B', len(result.split('.')[0]))
-    for char in result.split('.')[0]:
-        data = data + struct.pack('c', char)
-    data = data + struct.pack('>H', 0xc00c)
-
-    print ('\n\tsortie : contructDnsRequestMX : DATA= ' + str(data) + '\n')
-    return data
-
-
-
-def contructDnsReplyTypNS(domain, clas, typ, result, add):
-    """"""
-
-    print('\n\tenter : contructDnsReplyNS')
-
-    data = ""
-
-  # id sur 2 octets
-    data = data + struct.pack('>H', 0)
-
-  # flag 2 octet 
-    data = data + struct.pack('>H', 0x8180)
-
-  # QDCOUNT sur 2 octets
-    data = data + struct.pack('>H', 1)
-
-  # ANCOUNT sur 2 octets
-    data = data + struct.pack('>H', 1)
-
-  # NScount su 2 octets
-    data = data + struct.pack('>H', 0)  # ToDo quand type = NS ou MX
-
-  # ARcount su 2 octets
-    data = data + struct.pack('>H', add)  # ToDo quand type = NS ou MX
-
-    nb_octet = 12
-
-  # non de domaine su x octets
-    splitname = domain.split('.')
-    for c in splitname:
-        data = data + struct.pack('B', len(c))
-        nb_octet = nb_octet + 1
-        for l in c:
-            data = data + struct.pack('c', l)
-            nb_octet = nb_octet + 1
-
-  # 1 octet = 00 pr dire la fin du nom de dommaine
-    data = data + struct.pack('B', 0)
-
-  # TYPE
-    data = data + struct.pack('>H', typenumber(typ))
-
-  # CLASS
-    data = data + struct.pack('>H', clasnumber(clas))
-
-    # DONNES
-    data_len=2+len(result.split('.')[0])+1+2
-    data = data + struct.pack('>HHHIH', 0xc00c, typenumber(typ), clasnumber(clas), 60000, data_len )
-
-    data = data + struct.pack('B', len(result.split('.')[0]))
-    for char in result.split('.')[0]:
-        data = data + struct.pack('c', char)
-    data = data + struct.pack('>H', 0xc00c)
-
-    print ('\n\tsortie : contructDnsRequestNS : DATA= ' + str(data) + '\n')
-    return data
-
-
-def contructDnsReplyTypMXAdd(clas_add, typee_add, result_add):
-    """"""
-
-    #0xc028 car vus sur le wireshark
-    return struct.pack('>HHHIH4B', 0xc028, typenumber(typee_add), clasnumber(clas_add), 60000, 4, *(int(x) for x in result_add.split('.')) )
-
-
-def contructDnsReplyTypNSAdd(clas_add, typee_add, result_add):
-    """"""
-
-    #0xc028 car vus sur le wireshark
-    return struct.pack('>HHHIH4B', 0xc028, typenumber(typee_add), clasnumber(clas_add), 60000, 4, *(int(x) for x in result_add.split('.')) )
-
-
-i = 12
-
-def retrquest(string, pos):
-    """decrit une section question presente dans la reponse DNS string a la position pos"""
-
-    p = pos
-    (p, name) = getname(string, p)
-    typ = struct.unpack('>H', string[p:p + 2])[0]
-    p = p + 2
-    clas = struct.unpack('>H', string[p:p + 2])[0]
-    p = p + 2
-    
-    return (p, name, typ, clas)
-
-
+##
+#   Fonction utilisé pour stocker dans le cache (=db.static) les nouveaux enregistrement ramner par IspA
+##
 def retrrr(string, pos):
     """decrit une section resource record presente dans la reponse DNS string a la position pos"""
 
@@ -522,186 +204,516 @@ def retrrr(string, pos):
     return (p,name,typ,clas,ttlcpl[0] * 256 + ttlcpl[1],datalen,dat)
 
 
-def printTheEnd():
-    """affichage de la fin"""
-    print('\n\n=========================== The end ... ===========================')
-    print('\n\n+-----------------------------------+') 
-    print('|                                   |')
-    print('|         PROXY : Listen 80         |')
-    print('|                                   |')
-    print('+-----------------------------------+\n\n')
+###############################
+#                             #
+#     Def fonction : NOUS     #
+#                             #
+###############################
+
+def ctlProtocolGet(requete):
+    """Verifie que le protocole soit bien du GET"""
+    try:
+        protocol = requete.split(' ')[0]
+    except:
+        raise CannotIdentifyProtocol("Protocole ne peux etre identifié")
+    if protocol != 'GET':
+        raise ProtocolNotGet("Protocole n'est pas GET")
+
+
+def ctlVariableDns(requete):
+    """ Verifie que la variable soit dns"""
+    varible = (requete.split('?')[1])[:3]
+    if varible != 'dns':
+        raise VariableNotDns("Variable n'est pas dns")
+
+
+def sendToCustomerError(s, num_error):
+    """envoie sur la socket s un code erreur"""
+    s.send("""HTTP/1.0 %s ERROR
+""" % (num_error,) ) 
+
+
+def getNameDomaine(data):
+    """Retourner le nom de dommaine, le type et la classe de la requete"""
+
+    #header = struct.unpack('>HBBHHHH', data[:12])
+    (pos, name, typ, clas) = retrquest(data, 12)
+    return (name, typ, clas)
+
+
+def sendToCustomer(data, s, leng):
+    """envoie sur la socket s la requete Dns"""
+    s.send("""HTTP/1.0 200 OK
+Content-Type: application/dns-message
+Content-Length: %s
+
+%s
+""" % (leng, data))
+
+
+def Isknown(name, typ):
+    """ Verircation dans le cache(= le fichier db.static) si un enregistrement avec le nom de domaine (=name) et le type (=typ) est deja present dans le fichier. Retourne vrai/faux puis l'enregistre si il existe sous forme d'un tuple."""
+
+    # stock les lignes du ficher db.static dans un tableau
+    file = open('/etc/bind/db.static', 'r')
+    tab = file.readlines()
+    file.close()
+
+    for ligne in tab:
+        # on extrait pour chaque ligne le nom de domaine, le type, la classe et le resultat
+        domain = ligne.split('\t')[0]
+        typee = ligne.split('\t')[1].split('  ')[1]
+        clas = ligne.split('\t')[1].split('  ')[0]
+        result = ligne.split('\t')[2]
+        
+        if domain == name and typee == typ:
+            return (True, domain, clas, typee, result)
+        else:
+            pass
+    return (False, """""", """""", """""", """""")
+
+
+
+def contructDnsReplyTypA(domain, clas, typ, result):
+    """construction de la requete de reponse pour les enregistrements du nom de domaine (=domain), de la classe (=clas), du type (=typ=A) et du resultat (=result)"""
+
+    print ('\n\enter : contructDnsRequest')
+
+    data = ""
+
+    # id sur 2 octets
+    data = data + struct.pack('>H', 0)
+
+    # flag 2 octet : reponse correcte
+    data = data + struct.pack('>H', 0x8180)
+
+    # QDCOUNT sur 2 octets : question
+    data = data + struct.pack('>H', 1)
+
+    # ANCOUNT sur 2 octets : section reponse est bien presente
+    data = data + struct.pack('>H', 1)
+
+    # NScount su 2 octets : pas de section d'autorité
+    data = data + struct.pack('>H', 0)  
+
+    # ARcount su 2 octets : pas de section additionelle
+    data = data + struct.pack('>H', 0)  
+
+    # decoupage du nom de domaine selon les '.'
+    splitname = domain.split('.')
+    for c in splitname:
+        data = data + struct.pack('B', len(c)) # on dit de combien de character est le prochain mot
+        for l in c:
+            data = data + struct.pack('c', l) # ajoute à data le charactere c codé en octet
+
+    # 1 octet = 00 pour dire que c'est la fin du nom de dommaine
+    data = data + struct.pack('B', 0)
+
+    # type sous le format numerique
+    data = data + struct.pack('>H', typenumber(typ))
+
+    # CLASS 1 (IN) par defaut
+    data = data + struct.pack('>H', clasnumber(clas))
+
+    # DONNES
+    data += struct.pack('>HHHIH4B', 0xc00c, typenumber(typ), clasnumber(clas), 60000, 4, *(int(x) for x in result.split('.')) )
+    
+
+    print ('\n\tsortie : contructDnsRequest : DATA= ' + str(data) + '\n')
+    return data
+
+
+
+def contructDnsReplyTypMX(domain, clas, typ, result, pref, add):
+    """construction de la requete de reponse pour les enregistrements du nom de domaine (=domain), de la classe (=clas), du type (=typ=MX), resultat (=result), preference (=pref) et add correspond à l'octet pour la section additionel"""
+
+    print('\n\tenter : contructDnsReplyMX')
+
+    # meme expliction que pour la fonction contructDnsReplyTypA...
+
+    data = ""
+    data = data + struct.pack('>H', 0)
+    data = data + struct.pack('>H', 0x8180)
+    data = data + struct.pack('>H', 1)
+
+    # ANCOUNT sur 2 octets : section reponse est bien presente
+    data = data + struct.pack('>H', 1)
+    data = data + struct.pack('>H', 0)  
+
+    # ARcount su 2 octets : section additionel depends de add qui prend les valeurs 0 (=pas de section) et 1 (= une section additionel)
+    data = data + struct.pack('>H', add)  
+
+    splitname = domain.split('.')
+    for c in splitname:
+        data = data + struct.pack('B', len(c)) 
+        for l in c:
+            data = data + struct.pack('c', l) 
+
+    data = data + struct.pack('B', 0)
+    data = data + struct.pack('>H', typenumber(typ))
+    data = data + struct.pack('>H', clasnumber(clas))
+
+    # DONNEES
+
+    data_len=2+len(result.split('.')[0])+1+2
+    data = data + struct.pack('>HHHIHH', 0xc00c, typenumber(typ), clasnumber(clas), 60000, data_len, pref )
+
+    data = data + struct.pack('B', len(result.split('.')[0]))
+    for char in result.split('.')[0]:
+        data = data + struct.pack('c', char)
+    data = data + struct.pack('>H', 0xc00c)
+
+    print ('\n\tsortie : contructDnsRequestMX : DATA= ' + str(data) + '\n')
+    return data
+
+
+
+def contructDnsReplyTypNS(domain, clas, typ, result, add):
+    """construction de la requete de reponse pour les enregistrements du nom de domaine (=domain), de la classe (=clas), du type (=typ=MX), resultat (=result), preference (=pref) et add correspond à l'octet pour la section additionel"""
+
+    print('\n\tenter : contructDnsReplyNS')
+
+    # meme expliction que pour la fonction contructDnsReplyTypMX...
+
+    data = ""
+    data = data + struct.pack('>H', 0)
+    data = data + struct.pack('>H', 0x8180)
+    data = data + struct.pack('>H', 1)
+    data = data + struct.pack('>H', 1)
+    data = data + struct.pack('>H', 0)  # ToDo quand type = NS ou MX
+    data = data + struct.pack('>H', add)  # ToDo quand type = NS ou MX
+
+    splitname = domain.split('.')
+    for c in splitname:
+        data = data + struct.pack('B', len(c))
+        for l in c:
+            data = data + struct.pack('c', l)
+
+
+    data = data + struct.pack('B', 0)
+    data = data + struct.pack('>H', typenumber(typ))
+    data = data + struct.pack('>H', clasnumber(clas))
+
+    # DONNES
+    data_len=2+len(result.split('.')[0])+1+2
+    data = data + struct.pack('>HHHIH', 0xc00c, typenumber(typ), clasnumber(clas), 60000, data_len )
+
+    data = data + struct.pack('B', len(result.split('.')[0]))
+    for char in result.split('.')[0]:
+        data = data + struct.pack('c', char)
+    data = data + struct.pack('>H', 0xc00c)
+
+    print ('\n\tsortie : contructDnsRequestNS : DATA= ' + str(data) + '\n')
+    return data
+
+def contructDnsReplyTypMXAdd(clas_add, typee_add, result_add):
+    """contruction de la partie additionel pour un enregistre de type MX"""
+
+    #0xc028 car vus sur le wireshark
+    return struct.pack('>HHHIH4B', 0xc028, typenumber(typee_add), clasnumber(clas_add), 60000, 4, *(int(x) for x in result_add.split('.')) )
+
+
+
+###############################
+#                             #
+#     Def fonction : bonus    #     les fonctions utilisé pour écrire dans db.static
+#                             #
+###############################
+
+
+def clasnumber(clas):
+    """associe un entier a un nom une classe"""
+    if clas == 'IN':
+        return 1
+    if clas == 'CS':
+        return 2
+    if clas == 'CH':
+        return 3
+    if clas == 'HS':
+        return 4
+
+
+def numbertoclas(clas):
+    """associe un entier a un nom une classe"""
+    if clas == 1:
+        return 'IN'
+    if clas == 2:
+        return 'CS'
+    if clas == 3:
+        return 'CH'
+    if clas == 4:
+        return 'HS'
+
+
+def stock(name, typ, clas, data):
+    """on stock dans le cache (db.static) les nouvelles enter selon le type"""
+
+    file = open('/etc/bind/db.static', 'a')
+    if typ == 1: # A
+        file.write(name + '\t' + numbertoclas(clas) + '  ' + numbertotype(typ) + '\t' + str(data) + '\n')
+    elif typ == 15: # MX 
+        preference=data[0]
+        answer=data[1]
+        file.write(name + '\t' + numbertoclas(clas) + '  ' + numbertotype(typ) + '\t' + str(preference) + ' ' + str(answer) + '\n')
+    elif typ == 2: # NS
+        file.write(name + '\t' + numbertoclas(clas) + '  ' + numbertotype(typ) + '\t' + str(data) + '\n')
+    else:
+        # pour le dm on ne traitre pas les autre types
+        pass
+    file.close()
 
 
 def infoToStock(data,qdcount,ancount,nscount,arcount):
+    """stock en fonction des sections que ramene IspA lors d'une requete dns"""
 
-    i = 12
-    data_answer = 'null'
+    # reprise sous forme de fonction la fin du client qui permetait d'interpreter la reponse dns renvoyé par boxA
+
+    i = 12 # on commence apres l'entete de la requete dns
+    data_answer = 'null' # ini la raponse pour ne pas stocker les autres section si jamais pas de section reponse
+
+    # partie de la question : on recupere le nom de domaine (=name_answer), le type (=typ_answer) et la classe (=clas_answer)
     if qdcount:
-        print('QUERY SECTION :\n')
         for j in range(qdcount):
             (pos, name_answer, typ_answer, clas_answer) = retrquest(data, i)
             i = pos
-            print (name_answer + '   ' + numbertotype(typ_answer) + '   ' + str(clas_answer))
-        print ('\n')
 
+    # partie reponse : on recupere la reponse de la requete dns (=data_answer) et sous forme de tuple si jamais le type est MX
     if ancount:
-        print('ANSWER SECTION :\n')
         for j in range(ancount):
             (pos,name,typ,clas,ttl,datalen,data_answer) = retrrr(data, i)
             i = pos
-            if typ == 15:
-                print(name + '   ' + numbertotype(typ) + '   ' + str(clas) + '   ' + str(ttl) + '   ' + str(data_answer[0]) + '   ' + data_answer[1])
-            else:
-                print(name + '   ' + numbertotype(typ) + '   ' + str(clas) + '   ' + str(ttl) + '   ' + str(data_answer))
-        print ('\n')
 
+    # partie autoriter :
     if nscount:
-        print('AUTHORITY SECTION :\n')
         for j in range(nscount):
             (pos,name_authority,typ_authority,clas_authority,ttl,datalen,data_authority) = retrrr(data, i)
             i = pos
-            #print ('...... data_autorytity = >'+data_authority+'<')
-            # print(name+"   "+numbertotype(typ)+"   "+str(clas)+"   "+str(ttl)+"   "+"str(dat)=...")
-        print ('\n')
 
+    # partie additionel : 
     if arcount:
-        print ('ADDITIONAL SECTION :\n')
         for j in range(arcount):
             (pos,name_additional,typ_additional,clas_additional,ttl,datalen,data_additional,) = retrrr(data, i)
             i = pos
-            print(name_additional + '   ' + numbertotype(typ_additional) + '   ' + str(clas_additional) + '   ' + str(ttl) + '   ' + str(data_additional))
-        print ('\n')
     
     if data_answer != 'null':
+        
+        # on stock les dans un nouveau enregistrement la reponse de la requete dns
+        stock(name_answer, typ_answer, clas_answer, data_answer)
+
+        # on stock en fonction de la presence des different autres sections 
         if nscount:
             stock(name_authority, typ_authority, clas_authority, data_authority)
         if arcount:    
             stock(name_additional, typ_additional, clas_additional, data_additional)
 
-    return (name_answer, typ_answer, clas_answer, data_answer)
+
+
+
+
+
+
+
+# a supprimer !!!
+def contructDnsReplyTypNSAdd(clas_add, typee_add, result_add):
+    """"""
+
+    #0xc028 car vus sur le wireshark
+    return struct.pack('>HHHIH4B', 0xc028, typenumber(typee_add), clasnumber(clas_add), 60000, 4, *(int(x) for x in result_add.split('.')) )
+
+
+i = 12
+
+
+
+
+
+
+
+
+###############################
+#                             #
+#   Def fonction : affichage  #
+#                             #
+###############################
+
+def printTheEnd():
+    print('\n\n=========================== The end ... ===========================\n\n\n+-----------------------------------+\n|                                   |\n|         PROXY : Listen 80         |\n|                                   |\n+-----------------------------------+\n\n')
+
+def printErrorGet():
+    print('\n\n _____________________________\n/                             \\\n!  Le protocole est incorect, !\n!  le seul autorise est GET   !\n\_____________________________/\n')
+
+def printErrorDns():
+    print('\n\n _____________________________\n/                             \\\n!  La variable est incorect,  !\n!  la seul autorise est dns   !\n\_____________________________/\n')
+
+def printsendCustomer():
+    print ('\n/-------------------------\              |~~\_____/~~\__  |\n|     REPLY TO CLIENT     |______________ \______====== )-+\n|        tk IspA          |                      ~~~|/~~  |\n\-------------------------/                         ()\n')
+
+def printsendCustomerCache():
+    print ('\n/-------------------------\              |~~\_____/~~\__  |\n|     REPLY TO CLIENT     |______________ \______====== )-+\n| whith data in db.static |                      ~~~|/~~  |\n\-------------------------/                         ()\n')
+
+def printAskIspa():
+    print('   _____________ _\n _/_|[][][][][] |--\n(  ask IspA dns |--- -\n=--OO-------OO--=-- ---\n')
 
 
 
 while True:
-    (data, addr) = s.accept()
-    print ('Data : ' + str(data) + 'addr : ' + str(addr))
 
-    requete = data.recv(1024)
+    # accepte une socket à la fois puis stock la donnee dans requete
+    (client, addr) = s.accept()
+    requete = client.recv(1024)
 
-    protocol = requete.split(' ')[0]
-    ctlProtocolGet(protocol)
+    # Controle que le protocole de la requete soit bien du GET
+    isCorretProtocol=True
+    try:
+        ctlProtocolGet(requete)
+    except ProtocolNotGet:
+        isCorretProtocol=False
+        sendToCustomerError(client, 801)
+        printErrorGet()
+    except CannotIdentifyProtocol:
+        print('\n\n==========> CannotIdentifyProtocol \n\n')
 
-    varible = (requete.split('?')[1])[:3]
-    ctlVariableDns(varible)
 
-    dns_b64encode = requete.split('dns=')[1].split(' ')[0]
-    dns_b64decode = base64.b64decode(dns_b64encode, '-_')
+    # Controle que la variable de la requete soit bien dns
+    isCorretVariable=True
+    try:
+        ctlVariableDns(requete)
+    except VariableNotDns:
+        isCorretVariable=False
+        sendToCustomerError(client, 802)
+        printErrorDns()
 
-    (name, typ, clas) = getNameDomaine(dns_b64decode)
-    print ('\nRequete : ' + name + '\t' + numbertoclas(clas) + '  ' + numbertotype(typ) + '\n')
 
-    (is_known, domain, clas, typee, result) = Isknown(name,numbertotype(typ))
-    print("iskown result : "+result)
+    if isCorretProtocol and isCorretVariable :
 
-    test = 0
-    if is_known and test == 0:
-        print ('db.static : ' + domain + '\t' + clas + '  ' + typee + '\t' + result)
+        # extrai le corps de la requete, puis on decode celui-ci de la basse 64
+        dns_b64encode = requete.split('dns=')[1].split(' ')[0]
+        dns_b64decode = base64.b64decode(dns_b64encode, '-_')
 
-        if typee=='A':
-            requete_dns = contructDnsReplyTypA(domain, clas, typee, result)
-        elif typee=='MX':
-            pref=int(result.split(' ')[0])
-            result=result.split(' ')[1][:-1]
-            add=0
+        # on recupere le nom de domaine le type et la classe pour ensuite aller verifier si l'on a pas deja un enregistrement dans le cache avec ces infos
+        (name, typ, clas) = getNameDomaine(dns_b64decode)
+        #print ('\nRequete : ' + name + '\t' + numbertoclas(clas) + '  ' + numbertotype(typ) + '\n')
+        (is_known, domain, clas, typee, result) = Isknown(name,numbertotype(typ))
+        #print("iskown result : "+result)
 
-            # recher si dans le cache partie additional
-            print("recherche add ? >"+str(result)+'< '+numbertotype(1))
-            (is_known_add, domain_add, clas_add, typee_add, result_add) = Isknown(str(result),'A')
-            if is_known_add:
-                print('>oui')
-                add=1
-                requete_dns = contructDnsReplyTypMX(domain, clas, typee, result, pref, add)
-                requete_dns = requete_dns + contructDnsReplyTypMXAdd(clas_add, typee_add, result_add)
-            else :
-                requete_dns = contructDnsReplyTypMX(domain, clas, typee, result, pref, add)
-        elif typee=='NS':
-            print("recherche add NS ? >"+str(result)+'< '+numbertotype(1))
-            result=result[:-1]
-            add=0
-            (is_known_add, domain_add, clas_add, typee_add, result_add) = Isknown(str(result),'A')
-            if is_known_add: 
-                print('>oui = '+result_add)
-                #add=1
-                requete_dns = contructDnsReplyTypNS(domain, clas, typee, result, add)
+        if is_known :
+            #print ('db.static : ' + domain + '\t' + clas + '  ' + typee + '\t' + result)
 
-                # pb dans la construction du contructDnsReplyTypNSAdd
-                #requete_dns = requete_dns + contructDnsReplyTypNSAdd(clas_add, typee_add, result_add)
-            else :
-                requete_dns = contructDnsReplyTypNS(domain, clas, typee, result, add)
-        else: 
-            pass
-        
-        leng = len(requete_dns)
-        print('\n\n=====>len req cree ='+str(leng))
-        sendToAlice(requete_dns, data, leng)
+            if typee=='A':
+                requete_dns = contructDnsReplyTypA(domain, clas, typee, result)
 
-        print ('\n/-------------------------\              |~~\_____/~~\__  |')
-        print ('|     REPLY TO ALICE      |______________ \______====== )-+')
-        print ('| whith data in db.static |                      ~~~|/~~  |')
-        print ('\-------------------------/                         ()\n')
+            elif typee=='MX':
+                pref=int(result.split(' ')[0])
+                result=result.split(' ')[1][:-1] # 2eme partie de resultat et on suprime le retour à la linge
+                add=0 # init de la section additionel vide
 
-        data.close()
-        printTheEnd()
+                # recherche si dans le cache il y a la partie additional (~ ip de serveur smtp)
+                #print("recherche add ? >"+str(result)+'< '+numbertotype(1))
+                (is_known_add, domain_add, clas_add, typee_add, result_add) = Isknown(str(result),'A')
+                if is_known_add:
+                    #print('>oui')
+                    add=1
+                    requete_dns = contructDnsReplyTypMX(domain, clas, typee, result, pref, add)
+                    requete_dns = requete_dns + contructDnsReplyTypMXAdd(clas_add, typee_add, result_add)
+                else :
+                    requete_dns = contructDnsReplyTypMX(domain, clas, typee, result, pref, add)
 
-    else:
-        t = socket(AF_INET, SOCK_DGRAM)
-        t.connect(('1.2.3.4', 53))
-        print ('\nConnected to ispA = 1.2.3.4 port 53')
+            elif typee=='NS':
+                #print("recherche add NS ? >"+str(result)+'< '+numbertotype(1))
+                result=result[:-1] 
+                add=0
 
-        requete_dns = contructDnsRequest(name, numbertotype(typ))
+                (is_known_add, domain_add, clas_add, typee_add, result_add) = Isknown(str(result),'A')
+                if is_known_add:
+                    pass 
 
-        t.send(requete_dns)
+                    ##
+                    #   dans la config du lab actuel nous n'avons pas de partie aditionnel
+                    #   pour une demande de type NS, donc pas de traitement
+                    #   sinon un taitement du meme style que pour le type MX
+                    ##
 
-        print('   _____________ _')
-        print(' _/_|[][][][][] |--')
-        print('(  ask IspA dns |--- -')
-        print('=--OO-------OO--=-- ---\n')
+                    #requete_dns = contructDnsReplyTypNS(domain, clas, typee, result, add)
+                    #requete_dns = requete_dns + contructDnsReplyTypNSAdd(clas_add, typee_add, result_add)
 
-        data_recv = t.recv(1024)
-        leng = len(data_recv)
-        sendToAlice(data_recv, data, leng)
+                else :
+                    requete_dns = contructDnsReplyTypNS(domain, clas, typee, result, add)
+            else: 
+                # pour le dm on ne traitre pas les autre types
+                pass
+            
+            # on envoie au client la reponse que nous avons contruit sous la forme d'une requete dns
+            leng = len(requete_dns)
+            sendToCustomer(requete_dns, client, leng)
 
-        print ('\n/-------------------------\              |~~\_____/~~\__  |')
-        print ('|     REPLY TO ALICE      |______________ \______====== )-+')
-        print ('|        tk IspA          |                      ~~~|/~~  |')
-        print ('\-------------------------/                         ()\n')
+            printsendCustomerCache()
 
-        data.close()
+            # ferme la connexion avec le client
+            client.close()
+            printTheEnd()
 
-        print("\n######################\n#       Descrip      #\n######################\n")
-      # decriptage pour le metre dans la bdd
+        else:
 
-        data = data_recv
-        header = struct.unpack('>HBBHHHH', data[:12])
-        qdcount = header[3]
-        ancount = header[4]
-        nscount = header[5]
-        arcount = header[6]
+            # Socket UDP pour contacter IspA 
+            t = socket(AF_INET, SOCK_DGRAM)
+            t.connect(('1.2.3.4', 53))
+            print ('\nConnected to ispA = 1.2.3.4 port 53')
 
-      # Affichage de la reponse, section par section
-        print ('QUERY: ' + str(qdcount) + ', ANSWER: ' + str(ancount) + ', AUTHORITY: ' + str(nscount) + ', ADDITIONAL: ' + str(arcount) + '\n')
+            # on contruit puis envoie a IspA une requete dns
+            requete_dns = contructDnsRequest(name, numbertotype(typ))
+            t.send(requete_dns)
 
-        (name_answer, typ_answer, clas_answer, data_answer) = infoToStock(data,qdcount,ancount,nscount,arcount)
+            printAskIspa()
 
-        if data_answer != 'null':
-            print('\n A STOCKE : ' + name_answer + '\t' + numbertotype(typ_answer) + '  ' + str(clas_answer) + '\t' + str(data_answer) + '\n')
-            stock(name_answer, typ_answer, clas_answer, data_answer)
+            # on recoit la reponse de IspA puis on le renvoit directement au client
+            data_recv = t.recv(1024)
+            leng = len(data_recv)
+            sendToCustomer(data_recv, client, leng)
+
+            printsendCustomer()
+
+            # ferme la connexion avec le client et avec IspA
+            client.close()
+            t.close()
+            printTheEnd()
+
+
+            ##
+            #   Partie bonnus :
+            #   on va stocker en fonction des sections que ramene IspA lors d'une requete dns
+            #   des nouvelles lignes dans le cache (=db.static)
+            ##
+
+            # CAHNGEMENT !! data = data_recv
+            # decriptage pour reuperer savoir si il y a ses sections
+            header = struct.unpack('>HBBHHHH', data_recv[:12])
+            qdcount = header[3]
+            ancount = header[4]
+            nscount = header[5]
+            arcount = header[6]
+            infoToStock(data_recv,qdcount,ancount,nscount,arcount)    
+
+#
+#   /!\ stock diretement dans infoToStock
+#
+            #infoToStock(data_recv,qdcount,ancount,nscount,arcount)
+
+            # Affichage de la reponse, section par section
+            # print ('QUERY: ' + str(qdcount) + ', ANSWER: ' + str(ancount) + ', AUTHORITY: ' + str(nscount) + ', ADDITIONAL: ' + str(arcount) + '\n')
+
+            # (name_answer, typ_answer, clas_answer, data_answer) = infoToStock(data,qdcount,ancount,nscount,arcount)
+
+            # if data_answer != 'null':
+            #     print('\n A STOCKE : ' + name_answer + '\t' + numbertotype(typ_answer) + '  ' + str(clas_answer) + '\t' + str(data_answer) + '\n')
+            #     stock(name_answer, typ_answer, clas_answer, data_answer)
+
+                
 
             
-
-        t.close()
+    else :
+        # erreur dans la requete du client, donc on ferme sa connexion 
+        client.close()
         printTheEnd()
-
 
 
 
@@ -720,6 +732,9 @@ while True:
 #      ---> IspA : OK Question/Answer
 #      ---> Cache : OK Question/Answer
 #
+# test si pas get
+# test si pas dns
+# 
 #
 #
 ##
