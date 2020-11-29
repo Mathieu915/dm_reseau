@@ -9,6 +9,7 @@
 #   Date mise à jour : 29/11/2020 
 #   Rapport de la maj :
 #   	- correction dans ctlVariableDns(requete) pour bien recuperer la var et pas que les 3 premiers char
+#       - correction dans contructDnsReplyHeader(...) car il y avait une inversion entre les sections NScount et ARcount
 #	
 #	ToDo :
 # 		- fini
@@ -285,11 +286,11 @@ def contructDnsReplyHeader(domain, clas, typ, add=0):
     # ANCOUNT sur 2 octets : section reponse est bien presente
     data = data + struct.pack('>H', 1)
 
+    # NScount su 2 octets : pas de section autorité 
+    data = data + struct.pack('>H', 0)  
+
     # ARcount su 2 octets : section additionelle depend de add qui prend les valeurs 0 (=pas de section) et 1 (= une section additionelle)
     data = data + struct.pack('>H', add)   
-
-    # ARcount su 2 octets : pas de section additionelle
-    data = data + struct.pack('>H', 0)  
 
     # decoupage du nom de domaine selon les '.'
     splitname = domain.split('.')
@@ -560,11 +561,11 @@ def printError():
     print('\n\n _____________________________\n/                             \\\n!    ERREUR requete client    !\n\_____________________________/\n')
 
 def printErrorGet():
-    print('\n\n _____________________________\n/                             \\\n!  Le protocole est incorect, !\n!  le seul autorise est GET   !\n\_____________________________/\n')
+    print('\n\n _____________________________\n/                             \\\n!  Le protocole est incorect, !\n!  le seul autorisé est GET   !\n\_____________________________/\n')
 
 
 def printErrorDns():
-    print('\n\n _____________________________\n/                             \\\n!  La variable est incorect,  !\n!  la seul autorise est dns   !\n\_____________________________/\n')
+    print('\n\n _____________________________\n/                             \\\n!  La variable est incorect,  !\n!  la seul autorisé est dns   !\n\_____________________________/\n')
 
 def printsendCustomer():
     print ('\n/-------------------------\              |~~\_____/~~\__  |\n|     REPLY TO CLIENT     |______________ \______====== )-+\n|        tk IspA          |                      ~~~|/~~  |\n\-------------------------/                         ()\n')
