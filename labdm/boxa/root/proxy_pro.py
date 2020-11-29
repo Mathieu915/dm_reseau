@@ -24,9 +24,9 @@ print("               & thomas.chevalier1@etu.univ-orleans.fr")
 print("Web:           https://github.com/Mathieu915/dm_reseau")
 print("Description:   ")
 print("     Proxy DOH to DNS\n")
-print("     /!\ Parie bonus : on a implementé l'ajout de nouveaux ")
+print("     /!\ Parie bonus : nous avons implementé l'ajout de nouveaux ")
 print("     enregistrement dans le cache (=/etc/bind/db.static)... \n")
-print("     Donc on ne pose que une seule fois la question dns à IspA")
+print("     Donc on ne pose qu'une seule fois la question dns à IspA")
 print("     si IspA ramene une section réponse.")
 print("\n=======================================================================")
 
@@ -68,7 +68,7 @@ class CannotIdentifyVarible(Exception):
 
 ###############################
 #                             #
-#     Def fonction : PROF     #     c'est les fonctions du clien que l'on repri mais pas modifié
+#     Def fonction : PROF     #     c'est les fonctions du clien que l'on repris mais pas modifié
 #                             #
 ###############################
 
@@ -164,7 +164,7 @@ def contructDnsRequest(name, typ):
 
 
 ##
-#   Fonction utilisé pour stocker dans le cache (=db.static) les nouveaux enregistrement ramner par IspA
+#   Fonction utilisee pour stocker dans le cache (=db.static) les nouveaux enregistrement ramner par IspA
 ##
 def retrrr(string, pos):
     """decrit une section resource record presente dans la reponse DNS string a la position pos"""
@@ -207,7 +207,7 @@ def ctlProtocolGet(requete):
     try:
         protocol = requete.split(' ')[0]
     except:
-        raise CannotIdentifyProtocol("Protocole ne peux etre identifié")
+        raise CannotIdentifyProtocol("Protocole ne peut etre identifié")
     if protocol != 'GET':
         raise ProtocolNotGet("Protocole n'est pas GET")
 
@@ -217,7 +217,7 @@ def ctlVariableDns(requete):
     try:
         varible = (requete.split('?')[1]).split('=')[0]
     except:
-        raise CannotIdentifyVarible("Variable ne peux etre identifié")
+        raise CannotIdentifyVarible("Variable ne peut etre identifié")
     if varible != 'dns':
         raise VariableNotDns("Variable n'est pas dns")
 
@@ -229,7 +229,7 @@ def sendToCustomerError(s, num_error):
 
 
 def getNameDomaine(data):
-    """Retourner le nom de dommaine, le type et la classe de la requete"""
+    """Retourne le nom de dommaine, le type et la classe de la requete"""
 
     #header = struct.unpack('>HBBHHHH', data[:12])
     (pos, name, typ, clas) = retrquest(data, 12)
@@ -269,7 +269,7 @@ def Isknown(name, typ):
 
 
 def contructDnsReplyHeader(domain, clas, typ, add=0):
-    """ construction de l'entete de la requete de la reponse pour les enregistrements du nom de domaine (=domain), de la classe (=clas), du type (=typ) et add correspond à l'octet pour la section additionel par defaut il n'y en aura pas donc (=0)"""
+    """ construction de l'entete de la requete, de la reponse pour les enregistrements, du nom de domaine (=domain), de la classe (=clas), du type (=typ) et add correspond à l'octet pour la section additionel par defaut il n'y en aura pas donc (=0)"""
 
     data = ""
 
@@ -285,7 +285,7 @@ def contructDnsReplyHeader(domain, clas, typ, add=0):
     # ANCOUNT sur 2 octets : section reponse est bien presente
     data = data + struct.pack('>H', 1)
 
-    # ARcount su 2 octets : section additionel depends de add qui prend les valeurs 0 (=pas de section) et 1 (= une section additionel)
+    # ARcount su 2 octets : section additionelle depend de add qui prend les valeurs 0 (=pas de section) et 1 (= une section additionelle)
     data = data + struct.pack('>H', add)   
 
     # ARcount su 2 octets : pas de section additionelle
@@ -294,11 +294,11 @@ def contructDnsReplyHeader(domain, clas, typ, add=0):
     # decoupage du nom de domaine selon les '.'
     splitname = domain.split('.')
     for c in splitname:
-        data = data + struct.pack('B', len(c)) # on dit de combien de character est le prochain mot
+        data = data + struct.pack('B', len(c)) # on dit de combien de characteres est le prochain mot
         for l in c:
             data = data + struct.pack('c', l) # ajoute à data le charactere c codé en octet
 
-    # 1 octet = 00 pour dire que c'est la fin du nom de dommaine
+    # 1 octet = 00 pour dire que c'est la fin du nom de domaine
     data = data + struct.pack('B', 0)
 
     # type sous le format numerique
@@ -315,7 +315,7 @@ def contructDnsReplyHeaderData(typ, clas, result):
 
     data = ""
 
-    # nom de domaine compreser : sur 16bits: le pointeur sur 2 bits: 11 suivie de la position du nom de domaine dans la requete dns, toujours a la meme place, apres l'entête qui fait 12 octets, les 14 bit suivant sont : 00 0000  0000 0000 1100 (= c00c en octet)
+    # nom de domaine compressé : sur 16bits: le pointeur sur 2 bits: 11 suivi de la position du nom de domaine dans la requete dns, toujours a la meme place, apres l'entête qui fait 12 octets, les 14 bits suivant sont : 00 0000  0000 0000 1100 (= c00c en octet)
     data += struct.pack('>H', 0xc00c)
 
     # type sous le format numerique
@@ -335,12 +335,12 @@ def contructDnsReplyDataResult(result):
 
     data = ""
 
-    # on dit de combien de character est le prochain mot
+    # on dit de combien de characteres est le prochain mot
     data = data + struct.pack('B', len(result.split('.')[0]))
     for char in result.split('.')[0]:
         data = data + struct.pack('c', char) # ajoute à data le charactere c codé en octet
     
-    # nom de domaine compreser 
+    # nom de domaine compressé
     data = data + struct.pack('>H', 0xc00c)
 
     return data
@@ -352,7 +352,7 @@ def contructDnsReplyTypA(domain, clas, typ, result):
     # entête de la requete dns
     data = contructDnsReplyHeader(domain,clas,typ)
 
-    # données : nom de domaine compresé, le type, la classe et le ttl de 60 000sec
+    # données : nom de domaine compressé, le type, la classe et le ttl de 60 000sec
     data += contructDnsReplyHeaderData(typ, clas, result)
 
     # data lenght = 4 car ipV4 x.y.z.t
@@ -366,12 +366,12 @@ def contructDnsReplyTypA(domain, clas, typ, result):
 
 
 def contructDnsReplyTypMX(domain, clas, typ, result, pref, add):
-    """construction de la requete de reponse pour les enregistrements du nom de domaine (=domain), de la classe (=clas), du type (=typ=MX), resultat (=result), preference (=pref) et add correspond à l'octet pour la section additionel"""
+    """construction de la requete de reponse pour les enregistrements du nom de domaine (=domain), de la classe (=clas), du type (=typ=MX), resultat (=result), preference (=pref) et add correspond à l'octet pour la section additionelle"""
 
     # entête de la requete dns
     data = contructDnsReplyHeader(domain,clas,typ,add)
 
-    # données : nom de domaine compresé, le type, la classe et le ttl de 60 000sec
+    # données : nom de domaine compressé, le type, la classe et le ttl de 60 000sec
     data += contructDnsReplyHeaderData(typ, clas, result)
 
     # data lenght = 2 (= 2 octets pour la preference) + 1 (= octet pour décrir la taille du mot) + x (= octets pour le mot) + 2 (= )
@@ -381,36 +381,36 @@ def contructDnsReplyTypMX(domain, clas, typ, result, pref, add):
     # preference sur 2 octets
     data += struct.pack('>H', pref )
 
-    # la reponse : ecriture du nom de domaine de reponse comprésé
+    # la reponse : ecriture du nom de domaine de reponse compréssé
     data += contructDnsReplyDataResult(result)
 
     return data
 
 
 def contructDnsReplyTypNS(domain, clas, typ, result, add):
-    """construction de la requete de reponse pour les enregistrements du nom de domaine (=domain), de la classe (=clas), du type (=typ=MX), resultat (=result), preference (=pref) et add correspond à l'octet pour la section additionel"""
+    """construction de la requete de reponse pour les enregistrements du nom de domaine (=domain), de la classe (=clas), du type (=typ=MX), resultat (=result), preference (=pref) et add correspond à l'octet pour la section additionelle"""
 
     # entête de la requete dns
     data = contructDnsReplyHeader(domain, clas, typ, add)
 
-    # données : nom de domaine compresé, le type, la classe et le ttl de 60 000sec
+    # données : nom de domaine compressé, le type, la classe et le ttl de 60 000sec
     data += contructDnsReplyHeaderData(typ, clas, result)
 
     data_len = 2 + 1 + len(result.split('.')[0]) + 2
     data += struct.pack('>H', data_len)
 
-    # la reponse : ecriture du nom de domaine de reponse comprésé
+    # la reponse : ecriture du nom de domaine de reponse compréssé
     data += contructDnsReplyDataResult(result)
 
     return data
 
 
 def contructDnsReplyTypMXAdd(clas_add, typee_add, result_add, position_name_add):
-    """contruction de la partie additionel pour un enregistre de type MX"""
+    """contruction de la partie additionelle pour un enregistrement de type MX"""
 
     data = ""
 
-    # on dit où se situe le nom de domaine de la partie additionel
+    # on dit où se situe le nom de domaine de la partie additionelle
     data += struct.pack('>H', position_name_add)
 
     # comme pour une requete dns de type A ...
@@ -427,11 +427,11 @@ def contructDnsReplyTypMXAdd(clas_add, typee_add, result_add, position_name_add)
 def getPositionNameAdd(domain_add, requete_dns):
     """retourne la position (décimal) du nom de domaine dans la requete dns"""
 
-    # le nom de domaine pour la partie additionel est la reponse de la requete dns, du-coup ce nom se situe juste a la fin de la requete_dns
+    # le nom de domaine pour la partie additionelle est la reponse de la requete dns, du-coup ce nom se situe juste a la fin de la requete_dns
     len_request = len(requete_dns) 
-    len_domain_add = len(domain_add.split(".")[0]) # on ne recupere que la permiere partie du nom de domaine, celle qui a ete rajouter lors de la reponse ex: smtp par rapport a smtp.cold.net
+    len_domain_add = len(domain_add.split(".")[0]) # on ne recupere que la premiere partie du nom de domaine, celle qui a ete rajoutee lors de la reponse ex: smtp par rapport a smtp.cold.net
 
-    # 1 = 1 octet ou l'on code la longeur du mot, 2 = 2 octets qui correspond au nom de domaine de la question compresé (qui indique qu'il est situer en position 12 de la requete dns)
+    # 1 = 1 octet ou l'on code la longeur du mot, 2 = 2 octets qui correspond au nom de domaine de la question compressée (qui indique qu'il est situé en position 12 de la requete dns)
     len_domain_extension = 1 + 2
 
     position_name_add = len_request - (len_domain_add + len_domain_extension)
@@ -476,7 +476,7 @@ def numbertoclas(clas):
 
 
 def stock(name, typ, clas, data):
-    """on stock dans le cache (db.static) les nouvelles enter selon le type"""
+    """on stock dans le cache (db.static) les nouvelles entrees selon le type"""
 
     file = open('/etc/bind/db.static', 'a')
     if typ == 1 or typ == 2: # A ou NS
@@ -488,7 +488,7 @@ def stock(name, typ, clas, data):
         file.write(name + '\t' + numbertoclas(clas) + '  ' + numbertotype(typ) + '\t' + str(preference) + ' ' + str(answer) + '\n')
         print(name + '\t' + numbertoclas(clas) + '  ' + numbertotype(typ) + '\t' + str(preference) + ' ' + str(answer))
     else:
-        # pour le dm on ne traitre pas les autre types
+        # pour le dm on ne traite pas les autre types
         pass
     file.close()
     
@@ -496,10 +496,10 @@ def stock(name, typ, clas, data):
 def infoToStock(data,qdcount,ancount,nscount,arcount):
     """stock en fonction des sections que ramene IspA lors d'une requete dns"""
 
-    # reprise sous forme de fonction la fin du client qui permetait d'interpreter la reponse dns renvoyé par boxA
+    # reprise sous forme de fonction la fin du client qui permetait d'interpreter la reponse dns renvoyée par boxA
 
     i = 12 # on commence apres l'entete de la requete dns
-    data_answer = 'null' # ini la raponse pour ne pas stocker les autres section si jamais pas de section reponse
+    data_answer = 'null' # initialise la reponse pour ne pas stocker les autres sections si jamais pas de section reponse
 
     # partie de la question : on recupere le nom de domaine (=name_answer), le type (=typ_answer) et la classe (=clas_answer)
     if qdcount:
@@ -513,13 +513,13 @@ def infoToStock(data,qdcount,ancount,nscount,arcount):
             (pos,name,typ,clas,ttl,datalen,data_answer) = retrrr(data, i)
             i = pos
 
-    # partie autoriter :
+    # partie autoritee :
     if nscount:
         for j in range(nscount):
             (pos,name_authority,typ_authority,clas_authority,ttl,datalen,data_authority) = retrrr(data, i)
             i = pos
 
-    # partie additionel : 
+    # partie additionelle : 
     if arcount:
         for j in range(arcount):
             (pos,name_additional,typ_additional,clas_additional,ttl,datalen,data_additional,) = retrrr(data, i)
@@ -528,17 +528,17 @@ def infoToStock(data,qdcount,ancount,nscount,arcount):
     if data_answer != 'null':
         print('\nNouvelle(s) ligne(s) dans le cache : \n')
 
-        # on stock les dans un nouveau enregistrement la reponse de la requete dns
+        # on stock dans un nouvel enregistrement la reponse de la requete dns
         stock(name_answer, typ_answer, clas_answer, data_answer)
 
-        # on stock en fonction de la presence des different autres sections 
+        # on stock en fonction de la presence des differentes autres sections 
         if nscount:
             stock(name_authority, typ_authority, clas_authority, data_authority)
         if arcount:    
             stock(name_additional, typ_additional, clas_additional, data_additional)
 
 
-# on n'a pas traiter les section additionel pour un type = NS
+# on n'a pas traité les sections additionelles pour un type = NS car il n'y en n'a pas dans le lab
 def contructDnsReplyTypNSAdd(clas_add, typee_add, result_add, position_name_add):
     """"""
     # comme la fonction : contructDnsReplyTypMXAdd(...)
@@ -579,7 +579,7 @@ def printAskIspa():
 
 while True:
 
-    # accepte une socket à la fois puis stock la donnee dans requete
+    # accepte une socket à la fois puis stock la donnee dans la requete
     (data, addr) = s.accept()
     requete = data.recv(1024)
 
@@ -612,11 +612,11 @@ while True:
 
     if isCorretProtocol and isCorretVariable :
 
-        # extrai le corps de la requete, puis on decode celui-ci de la basse 64
+        # extraction du corps de la requete, decodage de celui-ci de la base 64
         dns_b64encode = requete.split('dns=')[1].split(' ')[0]
         dns_b64decode = base64.b64decode(dns_b64encode, '-_')
 
-        # on recupere le nom de domaine le type et la classe pour ensuite aller verifier si l'on a pas deja un enregistrement dans le cache avec ces infos
+        # on recupere le nom de domaine, le type et la classe pour ensuite aller verifier si l'on n'a pas deja un enregistrement dans le cache avec ces infos
         (name, typ, clas) = getNameDomaine(dns_b64decode)
         (is_known, domain, clas, typee, result) = Isknown(name,numbertotype(typ))
 
@@ -627,10 +627,10 @@ while True:
 
             elif typee=='MX':
                 pref=int(result.split(' ')[0])
-                result=result.split(' ')[1][:-1] # 2eme partie de resultat et on suprime le retour à la linge
-                add=0 # init de la section additionel vide
+                result=result.split(' ')[1][:-1] # 2eme partie de resultat et on suprimme le retour à la linge
+                add=0 # init de la section additionelle vide
 
-                # recherche si dans le cache il y a la partie additional (~ ip de serveur smtp)
+                # recherche si dans le cache il y a la partie additionelle (~ ip de serveur smtp)
                 (is_known_add, domain_add, clas_add, typee_add, result_add) = Isknown(str(result),'A')
                 if is_known_add:
                     add=1
@@ -649,7 +649,7 @@ while True:
                     pass 
 
                     ##
-                    #   dans la config du lab actuel nous n'avons pas de partie aditionnel
+                    #   dans la config du lab actuel nous n'avons pas de partie aditionnelle
                     #   pour une demande de type NS, donc pas de traitement
                     #   sinon un taitement du meme style que pour le type MX
                     ##
@@ -661,10 +661,10 @@ while True:
                 else :
                     requete_dns = contructDnsReplyTypNS(domain, clas, typee, result, add)
             else: 
-                # pour le dm on ne traitre pas les autre types
+                # pour le dm on ne traite pas les autres types
                 pass
             
-            # on envoie au client la reponse que nous avons contruit sous la forme d'une requete dns
+            # on envoie au client la reponse que nous avons construit sous la forme d'une requete dns
             leng = len(requete_dns)
             sendToCustomer(requete_dns, data, leng)
 
